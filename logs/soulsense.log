@@ -1,0 +1,17 @@
+2026-01-05 11:00:11,788 - INFO - Migrated scores table: added age column
+2026-01-05 11:00:11,810 - INFO - Question bank schema ensured
+2026-01-05 11:00:41,227 - INFO - Question bank schema ensured
+2026-01-05 11:02:21,710 - INFO - Migrated scores table: added age column
+2026-01-05 11:02:21,731 - INFO - Question bank schema ensured
+2026-01-05 11:29:58,067 [INFO] User started exam: Aleena, age_group=adult
+2026-01-05 11:33:40,603 - INFO - Application started
+2026-01-05 11:33:40,611 - INFO - Loaded 100 questions from DB
+2026-01-05 11:33:48,984 - INFO - Session started | user=Aleena | age=21 | age_group=adult
+2026-01-05 11:35:38,850 - INFO - Application started
+2026-01-05 11:35:38,853 - INFO - Loaded 10 questions from DB
+2026-01-05 11:36:03,413 - INFO - Session started | user=Aleena asd | age=11 | age_group=child
+2026-01-05 14:04:58,063 - INFO - Application started
+2026-01-05 14:04:58,073 - INFO - Loaded 10 questions from DB
+2026-01-05 14:21:56,888 - INFO - Application started
+2026-01-05 14:21:56,890 - INFO - Loaded 10 questions from DB
+2026-01-05 14:22:04,848 - INFO - Session started | user=asdasd | age=12 | age_group=child
