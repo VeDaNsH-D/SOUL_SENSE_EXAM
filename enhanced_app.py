@@ -6,6 +6,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import messagebox, Toplevel, scrolledtext
 from xai_explainer import SoulSenseXAI
+from ml_predictor import SoulSenseMLPredictor
 
 # DATABASE SETUP
 conn = sqlite3.connect("soulsense_db")
@@ -154,6 +155,7 @@ tk.Label(
 
 # QUIZ WINDOW
 def start_quiz(username, age):
+    q_scores = []  # Track individual question scores
     """Main assessment window"""
     filtered_questions = [
         q for q in questions if q["age_min"] <= age <= q["age_max"]
@@ -233,6 +235,7 @@ def start_quiz(username, age):
         counter_label.config(text=f"Question {current_q + 1} of {len(filtered_questions)}")
     
     def next_question():
+        q_scores.append(var.get()) 
         """Handle next question or completion"""
         nonlocal current_q, score
         
@@ -264,123 +267,281 @@ def start_quiz(username, age):
             xai.save_explanation(user_id, score, explanation)
             
             # Show results with XAI
-            show_results(username, score, explanation)
+           show_results(username, score, explanation, q_scores, age)
             quiz.destroy()
     
-    def show_results(username, score, explanation):
-        """Display results with XAI explanation"""
-        results_window = Toplevel()
-        results_window.title("Assessment Results")
-        results_window.geometry("900x700")
-        results_window.configure(bg=bg_color)
+def show_results(username, score, explanation, q_scores, age):
+    """Display results with ML XAI explanation"""
+    results_window = Toplevel()
+    results_window.title("Assessment Results with AI Insights")
+    results_window.geometry("1000x800")
+    results_window.configure(bg=bg_color)
+    
+    # Initialize ML predictor
+    ml_predictor = SoulSenseMLPredictor()
+    
+    # Get ML prediction with XAI
+    ml_result = ml_predictor.predict_with_explanation(q_scores, age, score)
+    
+    # Create notebook/tabs for different views
+    notebook = ttk.Notebook(results_window)
+    notebook.pack(fill='both', expand=True, padx=10, pady=10)
+    
+    # Tab 1: Summary
+    summary_frame = tk.Frame(notebook, bg=bg_color)
+    notebook.add(summary_frame, text='📊 Summary')
+    
+    # Header
+    tk.Label(
+        summary_frame,
+        text="🎯 Assessment Complete!",
+        font=("Arial", 24, "bold"),
+        bg=bg_color,
+        fg="#2c3e50"
+    ).pack(pady=20)
+    
+    # Score display with ML prediction
+    score_frame = tk.Frame(summary_frame, bg="#e8f5e9", relief=tk.RAISED, bd=2)
+    score_frame.pack(pady=10, padx=50, fill=tk.X)
+    
+    tk.Label(
+        score_frame,
+        text=f"👤 User: {username} | 🎂 Age: {age}",
+        font=("Arial", 14),
+        bg="#e8f5e9"
+    ).pack(pady=5)
+    
+    tk.Label(
+        score_frame,
+        text=f"📊 Total Score: {score}/25",
+        font=("Arial", 18, "bold"),
+        bg="#e8f5e9",
+        fg="#27ae60"
+    ).pack(pady=5)
+    
+    # ML Prediction
+    risk_colors = {
+        'Low Risk': "#27ae60",
+        'Moderate Risk': "#f39c12", 
+        'High Risk': "#e74c3c"
+    }
+    
+    risk_color = risk_colors.get(ml_result['prediction_label'], "#2c3e50")
+    
+    tk.Label(
+        score_frame,
+        text=f"🤖 AI Risk Assessment: {ml_result['prediction_label']}",
+        font=("Arial", 16, "bold"),
+        bg="#e8f5e9",
+        fg=risk_color
+    ).pack(pady=10)
+    
+    tk.Label(
+        score_frame,
+        text=f"🔍 Confidence: {ml_result['confidence']:.1%}",
+        font=("Arial", 14),
+        bg="#e8f5e9"
+    ).pack(pady=5)
+    
+    # Tab 2: ML Explanation
+    ml_frame = tk.Frame(notebook, bg=bg_color)
+    notebook.add(ml_frame, text='🤖 AI Insights')
+    
+    tk.Label(
+        ml_frame,
+        text="Machine Learning Analysis",
+        font=("Arial", 20, "bold"),
+        bg=bg_color,
+        fg="#2c3e50"
+    ).pack(pady=20)
+    
+    # ML Explanation
+    ml_text = scrolledtext.ScrolledText(
+        ml_frame,
+        wrap=tk.WORD,
+        width=90,
+        height=25,
+        font=("Arial", 11),
+        bg="#f8f9fa",
+        relief=tk.GROOVE,
+        bd=2
+    )
+    ml_text.pack(pady=10, padx=20)
+    ml_text.insert(tk.END, ml_result['explanation'])
+    ml_text.config(state=tk.DISABLED)
+    
+    # Tab 3: Feature Importance
+    feature_frame = tk.Frame(notebook, bg=bg_color)
+    notebook.add(feature_frame, text='📈 Feature Impact')
+    
+    tk.Label(
+        feature_frame,
+        text="How Each Factor Influenced Your Assessment",
+        font=("Arial", 18, "bold"),
+        bg=bg_color,
+        fg="#2c3e50"
+    ).pack(pady=20)
+    
+    # Create feature importance display
+    canvas = tk.Canvas(feature_frame, bg=bg_color, height=500)
+    scrollbar = tk.Scrollbar(feature_frame, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg=bg_color)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Display top features
+    row = 0
+    for feature, importance in list(ml_result['feature_importance'].items())[:10]:
+        feature_readable = feature.replace('_', ' ').title()
+        feature_value = ml_result['features'].get(feature, 0)
         
-        # Header
-        tk.Label(
-            results_window,
-            text="🎯 Assessment Complete!",
-            font=("Arial", 24, "bold"),
-            bg=bg_color,
-            fg="#2c3e50"
-        ).pack(pady=20)
-        
-        # Score display
-        score_frame = tk.Frame(results_window, bg="#e8f5e9", relief=tk.RAISED, bd=2)
-        score_frame.pack(pady=10, padx=50, fill=tk.X)
-        
-        tk.Label(
-            score_frame,
-            text=f"👤 User: {username}",
-            font=("Arial", 14),
-            bg="#e8f5e9"
-        ).pack(pady=5)
-        
-        tk.Label(
-            score_frame,
-            text=f"📊 Total Score: {score}/25",
-            font=("Arial", 18, "bold"),
-            bg="#e8f5e9",
-            fg="#27ae60"
-        ).pack(pady=10)
-        
-        # Score interpretation
-        if score <= 10:
-            interpretation = "🔴 Areas for Growth"
-            color = "#e74c3c"
-        elif score <= 15:
-            interpretation = "🟡 Moderate Awareness"
-            color = "#f39c12"
-        else:
-            interpretation = "🟢 Strong Emotional Intelligence"
-            color = "#27ae60"
-        
-        tk.Label(
-            results_window,
-            text=interpretation,
-            font=("Arial", 16, "bold"),
-            bg=bg_color,
-            fg=color
-        ).pack(pady=10)
-        
-        # XAI Explanation Section
-        tk.Label(
-            results_window,
-            text="📋 Detailed Analysis",
-            font=("Arial", 18, "bold"),
-            bg=bg_color,
-            fg="#2c3e50"
-        ).pack(pady=(20, 10))
-        
-        # Scrolled text for explanation
-        explanation_text = scrolledtext.ScrolledText(
-            results_window,
-            wrap=tk.WORD,
-            width=80,
-            height=20,
-            font=("Arial", 11),
-            bg="#f8f9fa",
-            relief=tk.GROOVE,
-            bd=2
+        # Create feature card
+        card = tk.Frame(
+            scrollable_frame,
+            bg="#ffffff",
+            relief=tk.RAISED,
+            bd=1
         )
-        explanation_text.pack(pady=10, padx=50)
-        explanation_text.insert(tk.END, explanation)
-        explanation_text.config(state=tk.DISABLED)  # Make read-only
+        card.grid(row=row, column=0, pady=5, padx=20, sticky="ew")
         
-        # Buttons
-        button_frame = tk.Frame(results_window, bg=bg_color)
-        button_frame.pack(pady=20)
-        
-        tk.Button(
-            button_frame,
-            text="💾 Save Report",
-            command=lambda: save_report(username, score, explanation),
+        # Importance bar
+        bar_width = int(importance * 300)
+        tk.Label(
+            card,
+            text="",
             bg="#3498db",
-            fg="white",
-            font=("Arial", 12, "bold"),
-            width=15,
-            relief=tk.RAISED
-        ).pack(side=tk.LEFT, padx=10)
+            width=bar_width,
+            anchor="w"
+        ).grid(row=0, column=0, sticky="w", ipady=5)
         
-        tk.Button(
-            button_frame,
-            text="🔄 Take Again",
-            command=lambda: [results_window.destroy(), start_quiz(username, age)],
-            bg="#9b59b6",
-            fg="white",
+        # Feature info
+        tk.Label(
+            card,
+            text=f"{feature_readable}",
             font=("Arial", 12, "bold"),
-            width=15,
-            relief=tk.RAISED
-        ).pack(side=tk.LEFT, padx=10)
+            bg="#ffffff",
+            fg="#2c3e50"
+        ).grid(row=0, column=1, padx=10, sticky="w")
         
-        tk.Button(
-            button_frame,
-            text="❌ Close",
-            command=lambda: [results_window.destroy(), close_app()],
-            bg="#e74c3c",
-            fg="white",
-            font=("Arial", 12, "bold"),
-            width=15,
-            relief=tk.RAISED
-        ).pack(side=tk.LEFT, padx=10)
+        tk.Label(
+            card,
+            text=f"Impact: {importance:.1%} | Value: {feature_value:.1f}",
+            font=("Arial", 10),
+            bg="#ffffff",
+            fg="#7f8c8d"
+        ).grid(row=1, column=1, padx=10, sticky="w", pady=(0, 5))
+        
+        row += 1
+    
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Buttons
+    button_frame = tk.Frame(results_window, bg=bg_color)
+    button_frame.pack(pady=10)
+    
+    # Generate feature importance plot
+    def generate_plot():
+        filename = ml_predictor.plot_feature_importance(
+            ml_result['feature_importance'],
+            username
+        )
+        messagebox.showinfo("Plot Saved", f"Feature importance plot saved as:\n{filename}")
+    
+    tk.Button(
+        button_frame,
+        text="📈 Save Feature Plot",
+        command=generate_plot,
+        bg="#3498db",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        width=15,
+        relief=tk.RAISED
+    ).pack(side=tk.LEFT, padx=5)
+    
+    tk.Button(
+        button_frame,
+        text="💾 Save Full Report",
+        command=lambda: save_full_report(username, score, explanation, ml_result),
+        bg="#9b59b6",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        width=15,
+        relief=tk.RAISED
+    ).pack(side=tk.LEFT, padx=5)
+    
+    tk.Button(
+        button_frame,
+        text="🔄 Take Again",
+        command=lambda: [results_window.destroy(), start_quiz(username, age)],
+        bg="#f39c12",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        width=15,
+        relief=tk.RAISED
+    ).pack(side=tk.LEFT, padx=5)
+    
+    tk.Button(
+        button_frame,
+        text="❌ Close",
+        command=lambda: [results_window.destroy(), close_app()],
+        bg="#e74c3c",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        width=15,
+        relief=tk.RAISED
+    ).pack(side=tk.LEFT, padx=5)
+
+def save_full_report(username, score, explanation, ml_result):
+    """Save comprehensive report with ML insights"""
+    filename = f"soulsense_ml_report_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    
+    report = f"""
+    SOUL SENSE - COMPREHENSIVE ASSESSMENT REPORT
+    {'='*60}
+    
+    BASIC INFORMATION:
+    • Username: {username}
+    • Total Score: {score}/25
+    • Assessment Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    
+    {'='*60}
+    AI MACHINE LEARNING ASSESSMENT:
+    • Risk Level: {ml_result['prediction_label']}
+    • Confidence: {ml_result['confidence']:.1%}
+    
+    PREDICTION PROBABILITIES:
+    • Low Risk: {ml_result['probabilities'][0]:.1%}
+    • Moderate Risk: {ml_result['probabilities'][1]:.1%}
+    • High Risk: {ml_result['probabilities'][2]:.1%}
+    
+    {'='*60}
+    FEATURE IMPORTANCE ANALYSIS:
+    """
+    
+    for feature, importance in ml_result['feature_importance'].items():
+        readable_name = feature.replace('_', ' ').title()
+        value = ml_result['features'].get(feature, 0)
+        report += f"\n• {readable_name}: {importance:.1%} (Value: {value:.1f})"
+    
+    report += f"\n\n{'='*60}"
+    report += "\nDETAILED EXPLANATION:\n"
+    report += ml_result['explanation']
+    
+    report += f"\n\n{'='*60}"
+    report += "\nTRADITIONAL ANALYSIS:\n"
+    report += explanation
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(report)
+    
+    messagebox.showinfo("Report Saved", f"Comprehensive report saved as:\n{filename}")
     
     def save_report(username, score, explanation):
         """Save report to text file"""
