@@ -152,8 +152,9 @@ conn.commit()
 
 # ---------------- LOAD QUESTIONS FROM DB ----------------
 try:
-    rows = load_questions()  # [(id, text)]
-    all_questions = [q[1] for q in rows]   # preserve text only
+    rows = load_questions()  # [(id, text, tooltip, min_age, max_age)]
+    # Store (text, tooltip) tuple
+    all_questions = [(q[1], q[2]) for q in rows]
     
     if not all_questions:
         raise ResourceError("Question bank empty: No questions found in database.")
@@ -757,8 +758,15 @@ class SoulSenseApp:
             self.finish_test()
             return
 
-        q = self.questions[self.current_question]
-        
+        q_data = self.questions[self.current_question]
+        # Handle both tuple (new format) and string (legacy safety)
+        if isinstance(q_data, tuple):
+            q_text = q_data[0]
+            q_tooltip = q_data[1]
+        else:
+            q_text = q_data
+            q_tooltip = None
+
         # Question counter
         self.create_widget(
             tk.Label,
@@ -773,11 +781,14 @@ class SoulSenseApp:
         self.create_widget(
             tk.Label,
             q_frame,
-            text=f"Q{self.current_question + 1}: {q}",
+            text=f"Q{self.current_question + 1}: {q_text}",
             wraplength=400,
             font=("Arial", 12)
         ).pack(side="left")
         
+        # Tooltip content
+        tooltip_text = q_tooltip if q_tooltip else "Select the option that best describes you.\nThere are no right or wrong answers."
+
         # Tooltip Icon
         info_btn = tk.Button(
             q_frame,
@@ -789,8 +800,8 @@ class SoulSenseApp:
             command=lambda: None # Placeholder, real action via bind
         )
         info_btn.pack(side="left", padx=5)
-        info_btn.bind("<Button-1>", lambda e: self.toggle_tooltip(e, "Select the option that best describes you.\nThere are no right or wrong answers."))
-        info_btn.bind("<Return>", lambda e: self.toggle_tooltip(e, "Select the option that best describes you.\nThere are no right or wrong answers."))
+        info_btn.bind("<Button-1>", lambda e: self.toggle_tooltip(e, tooltip_text))
+        info_btn.bind("<Return>", lambda e: self.toggle_tooltip(e, tooltip_text))
 
         # Bind Enter to Next
         self.root.bind("<Return>", lambda e: self.save_answer())
