@@ -4,6 +4,7 @@ Premium UI with modern aesthetics
 """
 
 import tkinter as tk
+from tkinter import ttk
 import logging
 import random
 
@@ -150,7 +151,7 @@ class AuthManager:
             activeforeground=colors.get("text_inverse", "#FFFFFF"),
             relief="flat",
             cursor="hand2",
-            width=10,
+            width=14,
             pady=8,
             borderwidth=0
         )
@@ -170,7 +171,7 @@ class AuthManager:
             activeforeground=colors.get("text_inverse", "#FFFFFF"),
             relief="flat",
             cursor="hand2",
-            width=10,
+            width=14,
             pady=8,
             borderwidth=0
         )
@@ -341,18 +342,16 @@ class AuthManager:
         )
         profession_label.pack(anchor="w", pady=(10, 5))
         
-        self.profession_entry = tk.Entry(
+        # Profession Field (Dropdown)
+        professions = ["Student", "Engineer", "Teacher", "Doctor", "Artist", "Manager", "Other"]
+        self.profession_entry = ttk.Combobox(
             form_inner,
-            font=("Segoe UI", 14),
-            bg=colors.get("entry_bg", "#FFFFFF"),
-            fg=colors.get("entry_fg", "#0F172A"),
-            insertbackground=colors.get("text_primary", "#0F172A"),
-            relief="flat",
-            highlightthickness=2,
-            highlightbackground=colors.get("border", "#E2E8F0"),
-            highlightcolor=colors.get("primary", "#3B82F6")
+            values=professions,
+            font=("Segoe UI", 12),
+            state="readonly"
         )
-        self.profession_entry.pack(fill="x", pady=(0, 20), ipady=8)
+        self.profession_entry.pack(fill="x", pady=(0, 20), ipady=4)
+        self.profession_entry.set("Student") # Default
         
         # Buttons
         buttons_frame = tk.Frame(content_frame, bg=colors["bg"])

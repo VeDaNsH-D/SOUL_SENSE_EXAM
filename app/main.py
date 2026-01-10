@@ -262,7 +262,10 @@ class SoulSenseApp:
 
     def apply_theme(self, theme_name):
         """Apply the selected theme to the application"""
+        # Call styles first (may set colors internally)
         self.styles.apply_theme(theme_name)
+        # Override with our complete color_schemes (includes chart colors)
+        self.colors = self.color_schemes.get(theme_name, self.color_schemes["light"])
 
     def toggle_tooltip(self, event, text):
         """Toggle tooltip visibility on click/enter"""
@@ -415,10 +418,26 @@ class SoulSenseApp:
                 return
         
         if AnalyticsDashboard:
-            dashboard = AnalyticsDashboard(self.root, self.username)
+            dashboard = AnalyticsDashboard(self.root, self.username, self.colors, self.current_theme)
             dashboard.open_dashboard()
         else:
             messagebox.showerror("Error", "Dashboard component could not be loaded")
+
+    def open_correlation_flow(self):
+        """Handle correlation analysis access"""
+        if not self.username:
+            name = simpledialog.askstring("Correlation Analysis", "Please enter your name:", parent=self.root)
+            if name and name.strip():
+                self.username = name.strip()
+            else:
+                return
+        
+        try:
+            from app.ui.correlation import CorrelationTab
+            correlation = CorrelationTab(self.root, self)
+            correlation.show()
+        except ImportError:
+            messagebox.showerror("Error", "Correlation analysis component could not be loaded")
 
     def run_bias_check(self):
         """Quick bias check after test completion"""

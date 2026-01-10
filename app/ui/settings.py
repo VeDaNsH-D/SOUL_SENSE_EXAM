@@ -22,14 +22,14 @@ class SettingsManager:
         # Create modal window
         self.settings_win = tk.Toplevel(self.root)
         self.settings_win.title("Settings")
-        self.settings_win.geometry("450x500")
+        self.settings_win.geometry("480x580")
         self.settings_win.resizable(False, False)
         self.settings_win.configure(bg=colors["bg"])
         
         # Center window on parent
         self.settings_win.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - 450) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 500) // 2
+        x = self.root.winfo_x() + (self.root.winfo_width() - 480) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 580) // 2
         self.settings_win.geometry(f"+{x}+{y}")
         
         # Make modal
