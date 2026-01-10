@@ -163,3 +163,64 @@ class PDFReportGenerator:
                     "You might find it challenging to identify or manage emotions. "
                     "Consider dedication time to emotional awareness practices and seek "
                     "feedback from trusted friends or mentors.")
+
+
+def generate_pdf_report(username, score, max_score, percentage, age, responses, questions, sentiment_score=None, filepath=None):
+    """
+    Wrapper function to generate PDF report.
+    This is the function imported by results.py.
+    """
+    try:
+        if filepath:
+            filename = filepath
+            # Ensure directory exists if user picked a folder that doesn't exist (unlikely but safe)
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+        else:
+            # Create output directory if it doesn't exist
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            output_dir = os.path.join(base_dir, "reports")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Generate unique filename with absolute path
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(output_dir, f"EQ_Report_{username}_{timestamp}.pdf")
+        
+        # Prepare score data
+        score_data = {
+            'total_score': score,
+            'max_score': max_score,
+            'percentage': percentage
+        }
+        
+        # Generate insights based on responses
+        insights = []
+        if percentage >= 80:
+            insights.append("Your emotional intelligence is excellent! Continue practicing mindfulness.")
+            insights.append("You demonstrate strong self-awareness and empathy skills.")
+        elif percentage >= 65:
+            insights.append("Good emotional awareness with potential for growth.")
+            insights.append("Consider practicing active listening to enhance empathy.")
+        elif percentage >= 50:
+            insights.append("Focus on recognizing emotional triggers in daily situations.")
+            insights.append("Practice self-regulation through breathing exercises.")
+        else:
+            insights.append("Start with basic emotion identification exercises.")
+            insights.append("Consider journaling to track emotional patterns.")
+        
+        # Create and generate report
+        generator = PDFReportGenerator(filename)
+        success = generator.generate(
+            username,
+            score_data,
+            insights,
+            sentiment_score or 0
+        )
+        
+        if success:
+            return filename
+        else:
+            raise Exception("PDF generation failed")
+            
+    except Exception as e:
+        logger.error(f"Error in generate_pdf_report: {e}")
+        raise

@@ -237,8 +237,24 @@ class ResultsManager:
             return
 
         try:
+            # Generate default filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_name = f"EQ_Report_{self.app.username}_{timestamp}.pdf"
+            
+            # Ask user for location
+            from tkinter import filedialog
+            filename = filedialog.asksaveasfilename(
+                title="Save PDF Reort",
+                initialfile=default_name,
+                defaultextension=".pdf",
+                filetypes=[("PDF Documents", "*.pdf"), ("All Files", "*.*")]
+            )
+            
+            if not filename:
+                return # User cancelled
+
             # Prepare data for report
-            filename = generate_pdf_report(
+            result_path = generate_pdf_report(
                 self.app.username,
                 self.app.current_score,
                 self.app.current_max_score,
@@ -246,451 +262,455 @@ class ResultsManager:
                 self.app.age,
                 self.app.responses,
                 self.app.questions,
-                self.app.sentiment_score if hasattr(self.app, 'sentiment_score') else None
+                self.app.sentiment_score if hasattr(self.app, 'sentiment_score') else None,
+                filepath=filename
             )
             
-            messagebox.showinfo("Success", f"Report saved successfully:\n{filename}")
-            
-            # Optional: Open the file
-            # import os
-            # os.startfile(filename) 
+            if result_path:
+                messagebox.showinfo("Success", f"Report saved successfully:\n{result_path}")
+                # Optional: Open the file
+                # import os
+                # os.startfile(result_path) 
             
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to generate PDF:\n{str(e)}")
             logging.error(f"PDF Export failed: {e}")
 
     def show_visual_results(self):
-        """Show visual results with charts and graphs"""
+        """Modern, elegant results page with responsive design"""
         self.app.clear_screen()
+        self.app.root.state('zoomed')
         
-        # Get benchmark comparisons
-        comparisons = self.get_benchmark_comparison()
-        benchmark_interpretations = self.get_benchmark_interpretation(comparisons)
+        colors = self.app.colors
         
-        # Create scrollable frame for results
-        canvas = tk.Canvas(self.app.root, bg=self.app.colors["bg"], highlightthickness=0)
-        scrollbar = tk.Scrollbar(self.app.root, orient="vertical", command=canvas.yview)
-        scrollable_frame = self.app.create_widget(tk.Frame, canvas)
+        # Main container - fills entire window
+        main_frame = tk.Frame(self.app.root, bg=colors.get("bg", "#0F172A"))
+        main_frame.pack(fill="both", expand=True)
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        # Create scrollable canvas
+        canvas = tk.Canvas(main_frame, bg=colors.get("bg", "#0F172A"), highlightthickness=0)
+        scrollbar = tk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg=colors.get("bg", "#0F172A"))
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        # Create window and store its ID for resizing
+        canvas_window = canvas.create_window((0, 0), window=scrollable, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Header
-        header_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        header_frame.pack(fill="x", pady=10, padx=20)
+        # Responsive: Update canvas width when window resizes
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", on_canvas_configure)
         
-        self.app.create_widget(
-            tk.Label,
-            header_frame,
-            text=f"Test Results for {self.app.username}",
-            font=("Arial", 22, "bold")
+        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        
+        # Safe mouse wheel binding
+        def _on_mousewheel(event):
+            try:
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            except:
+                pass
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        scrollable.bind("<MouseWheel>", _on_mousewheel)
+        
+        # ===== HEADER BAR with Menu Button =====
+        header_bar = tk.Frame(scrollable, bg="#22C55E")
+        header_bar.pack(fill="x")
+        
+        header_inner = tk.Frame(header_bar, bg="#22C55E")
+        header_inner.pack(fill="x", padx=20, pady=15)
+        
+        # Menu button on left
+        menu_btn = tk.Button(
+            header_inner,
+            text="☰ Menu",
+            font=("Segoe UI", 10),
+            bg="#16A34A", fg="white",
+            activebackground="#15803D", activeforeground="white",
+            relief="flat", cursor="hand2",
+            command=self.app.create_welcome_screen,
+            padx=12, pady=4
+        )
+        menu_btn.pack(side="left")
+        
+        # Title centered
+        title_frame = tk.Frame(header_inner, bg="#22C55E")
+        title_frame.pack(expand=True)
+        
+        tk.Label(
+            title_frame,
+            text="🎉 Assessment Complete!",
+            font=("Segoe UI", 22, "bold"),
+            bg="#22C55E", fg="white"
         ).pack()
         
-        # Score Summary
-        summary_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        summary_frame.pack(fill="x", pady=20, padx=20)
+        tk.Label(
+            title_frame,
+            text=f"Congratulations {self.app.username}!",
+            font=("Segoe UI", 11),
+            bg="#22C55E", fg="white"
+        ).pack()
         
-        # Create visual score display
-        score_display_frame = self.app.create_widget(tk.Frame, summary_frame)
-        score_display_frame.pack(pady=10)
+        # ===== CENTER CONTENT (max 800px width) =====
+        content_wrapper = tk.Frame(scrollable, bg=colors.get("bg", "#0F172A"))
+        content_wrapper.pack(fill="x", pady=30)
         
-        # Large score display
-        score_text = f"{self.app.current_score}/{self.app.current_max_score}"
-        score_label = self.app.create_widget(
-            tk.Label,
-            score_display_frame,
-            text=score_text,
-            font=("Arial", 36, "bold")
+        # Limit content width for elegant look
+        content = tk.Frame(content_wrapper, bg=colors.get("bg", "#0F172A"))
+        content.pack(anchor="center")
+        
+        # Section Header
+        tk.Label(
+            content,
+            text="Your Results Are Ready",
+            font=("Segoe UI", 18, "bold"),
+            bg=colors.get("bg", "#0F172A"),
+            fg=colors.get("text_primary", "#F8FAFC")
+        ).pack(pady=(0, 20))
+        
+        # ===== SCORE CARD =====
+        score_card = tk.Frame(
+            content,
+            bg=colors.get("surface", "#FFFFFF"),
+            highlightbackground=colors.get("border", "#E2E8F0"),
+            highlightthickness=1
         )
-        score_label.pack()
+        score_card.pack(pady=10, padx=20, ipadx=60, ipady=20)
         
-        # Percentage display
-        percentage_text = f"{self.app.current_percentage:.1f}%"
-        percentage_label = self.app.create_widget(
-            tk.Label,
-            score_display_frame,
-            text=percentage_text,
-            font=("Arial", 24)
-        )
-        percentage_label.pack()
+        card_inner = tk.Frame(score_card, bg=colors.get("surface", "#FFFFFF"))
+        card_inner.pack(padx=40, pady=25)
         
-        # Sentiment Score display (if available)
-        if hasattr(self.app, 'sentiment_score') and self.app.sentiment_score is not None:
-            sentiment_frame = self.app.create_widget(tk.Frame, score_display_frame)
-            sentiment_frame.pack(pady=10)
-            
-            # Sentiment label
-            self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text="Emotional Sentiment:",
-                font=("Arial", 12, "bold")
-            ).pack()
-            
-            # Sentiment score with color coding
-            if self.app.sentiment_score < -20:
-                sentiment_color = "#D32F2F"  # Red for negative
-                sentiment_label_text = "Negative"
-            elif self.app.sentiment_score > 20:
-                sentiment_color = "#388E3C"  # Green for positive
-                sentiment_label_text = "Positive"
-            else:
-                sentiment_color = "#FBC02D"  # Yellow for neutral
-                sentiment_label_text = "Neutral"
-            
-            sentiment_score_label = self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text=f"{self.app.sentiment_score:+.1f} ({sentiment_label_text})",
-                font=("Arial", 18, "bold"),
-                fg=sentiment_color
-            )
-            sentiment_score_label.pack()
-            
-            # Sentiment explanation
-            sentiment_desc = ""
-            if self.app.sentiment_score < -60:
-                sentiment_desc = "Your reflection shows significant distress"
-            elif self.app.sentiment_score < -20:
-                sentiment_desc = "Your reflection indicates some negative emotion"
-            elif self.app.sentiment_score > 60:
-                sentiment_desc = "Your reflection shows strong positive emotion"
-            elif self.app.sentiment_score > 20:
-                sentiment_desc = "Your reflection indicates positive feelings"
-            else:
-                sentiment_desc = "Your reflection shows balanced emotions"
-            
-            self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text=sentiment_desc,
-                font=("Arial", 10),
-                fg=self.app.colors["fg"]
-            ).pack()
+        tk.Label(
+            card_inner,
+            text="Your EQ Score",
+            font=("Segoe UI", 14),
+            bg=colors.get("surface", "#FFFFFF"),
+            fg=colors.get("text_secondary", "#64748B")
+        ).pack()
         
+        # Score display
+        score_frame = tk.Frame(card_inner, bg=colors.get("surface", "#FFFFFF"))
+        score_frame.pack(pady=10)
         
-        # Progress bar visualization
-        progress_frame = self.app.create_widget(tk.Frame, summary_frame)
-        progress_frame.pack(pady=20)
+        tk.Label(
+            score_frame,
+            text=str(self.app.current_score),
+            font=("Segoe UI", 48, "bold"),
+            bg=colors.get("surface", "#FFFFFF"),
+            fg="#22C55E"
+        ).pack(side="left")
         
-        self.app.create_widget(
-            tk.Label,
-            progress_frame,
-            text="Your EQ Score Progress:",
-            font=("Arial", 12, "bold")
-        ).pack(pady=5)
+        tk.Label(
+            score_frame,
+            text=f" / {self.app.current_max_score}",
+            font=("Segoe UI", 20),
+            bg=colors.get("surface", "#FFFFFF"),
+            fg=colors.get("text_tertiary", "#94A3B8")
+        ).pack(side="left", pady=(15, 0))
         
-        # Create progress bar canvas
-        progress_canvas = tk.Canvas(progress_frame, width=400, height=30, bg=self.app.colors["bg"], highlightthickness=0)
-        progress_canvas.pack()
+        # Average
+        avg = self.app.current_score / len(self.app.responses) if self.app.responses else 0
+        tk.Label(
+            card_inner,
+            text=f"Average: {avg:.1f} per question",
+            font=("Segoe UI", 11),
+            bg=colors.get("surface", "#FFFFFF"),
+            fg=colors.get("text_secondary", "#64748B")
+        ).pack(pady=(5, 10))
         
-        # Draw progress bar
-        progress_width = 400
-        fill_width = (self.app.current_percentage / 100) * progress_width
-        
-        # Determine color based on score
+        # Interpretation
         if self.app.current_percentage >= 80:
-            bar_color = self.app.colors["excellent"]
-            level = "Excellent"
+            interp, icolor = "Excellent emotional awareness!", "#22C55E"
         elif self.app.current_percentage >= 65:
-            bar_color = self.app.colors["good"]
-            level = "Good"
+            interp, icolor = "Good EQ with room for growth", "#3B82F6"
         elif self.app.current_percentage >= 50:
-            bar_color = self.app.colors["average"]
-            level = "Average"
+            interp, icolor = "Average - keep practicing!", "#F59E0B"
         else:
-            bar_color = self.app.colors["needs_work"]
-            level = "Needs Work"
+            interp, icolor = "Building skills together", "#EF4444"
         
-        # Draw background
-        progress_canvas.create_rectangle(0, 0, progress_width, 30, fill="#e0e0e0", outline="")
-        # Draw fill
-        progress_canvas.create_rectangle(0, 0, fill_width, 30, fill=bar_color, outline="")
-        # Draw text
-        progress_canvas.create_text(progress_width/2, 15, text=f"{level} - {self.app.current_percentage:.1f}%", 
-                                  fill="white" if self.app.current_percentage > 50 else "black",
-                                  font=("Arial", 10, "bold"))
-        
-        # Score markers
-        markers_frame = self.app.create_widget(tk.Frame, progress_frame)
-        markers_frame.pack(fill="x", pady=5)
-        
-        for i in range(0, 101, 25):
-            marker_label = self.app.create_widget(
-                tk.Label,
-                markers_frame,
-                text=f"{i}%",
-                font=("Arial", 8)
-            )
-            marker_label.pack(side="left", expand=True)
-        
-        # --- SENTIMENT ANALYSIS DISPLAY ---
+        tk.Label(
+            card_inner,
+            text=interp,
+            font=("Segoe UI", 12, "italic"),
+            bg=colors.get("surface", "#FFFFFF"),
+            fg=icolor
+        ).pack()
+
+        # Sentiment Score Display in Main Card
         if hasattr(self.app, 'sentiment_score') and self.app.sentiment_score is not None:
-            sentiment_frame = self.app.create_widget(tk.Frame, summary_frame)
-            sentiment_frame.pack(fill="x", pady=20, padx=20)
+            tk.Frame(card_inner, height=1, bg=colors.get("border", "#E2E8F0")).pack(fill="x", pady=15)
             
-            self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text="Emotional Sentiment:",
-                font=("Arial", 14, "bold")
-            ).pack(anchor="w")
+            s_score = self.app.sentiment_score
+            s_color = "#22C55E" if s_score > 20 else "#EF4444" if s_score < -20 else "#F59E0B"
+            s_text = "Positive" if s_score > 20 else "Negative" if s_score < -20 else "Neutral"
             
-            # Color coding
-            if self.app.sentiment_score > 20:
-                s_color = "green"
-                s_text = "Positive Outlook"
-            elif self.app.sentiment_score < -20:
-                s_color = "red"
-                s_text = "Negative Emotion"
-            else:
-                s_color = "#FFC107" # Amber
-                s_text = "Neutral/Balanced"
-                
-            self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text=f"{self.app.sentiment_score:+.1f} ({s_text})",
-                font=("Arial", 18, "bold"),
+            tk.Label(
+                card_inner,
+                text="Sentiment Analysis",
+                font=("Segoe UI", 11),
+                bg=colors.get("surface", "#FFFFFF"),
+                fg=colors.get("text_secondary", "#64748B")
+            ).pack()
+            
+            tk.Label(
+                card_inner,
+                text=f"{s_score:+.1f} ({s_text})",
+                font=("Segoe UI", 16, "bold"),
+                bg=colors.get("surface", "#FFFFFF"),
                 fg=s_color
-            ).pack(anchor="w", pady=5)
+            ).pack(pady=(5, 0))
+        
+        # ===== ACTION BUTTONS (Modern, Slim Design) =====
+        tk.Label(
+            content,
+            text="What would you like to do?",
+            font=("Segoe UI", 14, "bold"),
+            bg=colors.get("bg", "#0F172A"),
+            fg=colors.get("text_primary", "#F8FAFC")
+        ).pack(pady=(30, 15))
+        
+        # Button container with 3-column grid
+        btn_frame = tk.Frame(content, bg=colors.get("bg", "#0F172A"))
+        btn_frame.pack()
+        
+        actions = [
+            ("📊 Dashboard", "#14B8A6", self.app.open_dashboard_flow if hasattr(self.app, 'open_dashboard_flow') else None),
+            ("📈 Analysis", "#EC4899", self.show_detailed_analysis),
+            ("🤖 AI Insights", "#8B5CF6", self.show_ml_analysis if self.app.ml_predictor else None),
+            ("📄 Export PDF", "#06B6D4", self.export_results_pdf),
+            ("🔄 Retake Test", "#3B82F6", self.reset_test),
+            ("📜 History", "#F97316", self.show_history_screen),
+        ]
+        
+        for i, (text, color, cmd) in enumerate(actions):
+            row, col = i // 3, i % 3
             
-            # Description
-            if self.app.sentiment_score < -60:
-                desc = "Your reflection shows significant distress."
-            elif self.app.sentiment_score < -20:
-                desc = "Your reflection indicates some negative emotion."
-            elif self.app.sentiment_score > 60:
-                desc = "Your reflection shows strong positive emotion!"
-            elif self.app.sentiment_score > 20:
-                desc = "Your reflection indicates positive feelings."
-            else:
-                desc = "Your reflection shows balanced emotions."
-                
-            self.app.create_widget(
-                tk.Label,
-                sentiment_frame,
-                text=desc,
-                font=("Arial", 11, "italic"),
-                wraplength=400
-            ).pack(anchor="w")
-        # ----------------------------------
-        
-        # BENCHMARK SECTION
-        benchmark_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        benchmark_frame.pack(fill="x", pady=20, padx=20)
-        
-        self.app.create_widget(
-            tk.Label,
-            benchmark_frame,
-            text="Benchmark Analysis",
-            font=("Arial", 14, "bold")
-        ).pack(anchor="w", pady=10)
-        
-        # Benchmark interpretations
-        if benchmark_interpretations:
-            interpretation_frame = self.app.create_widget(tk.Frame, benchmark_frame)
-            interpretation_frame.pack(fill="x", pady=10)
-            
-            for interpretation in benchmark_interpretations:
-                self.app.create_widget(
-                    tk.Label,
-                    interpretation_frame,
-                    text=f"ΓÇó {interpretation}",
-                    font=("Arial", 10),
-                    anchor="w"
-                ).pack(anchor="w", pady=2)
-        
-        # Benchmark chart
-        if comparisons:
-            self.create_benchmark_chart(benchmark_frame, comparisons)
-        
-        # Detailed benchmark stats
-        if "global" in comparisons:
-            stats_frame = self.app.create_widget(tk.Frame, benchmark_frame)
-            stats_frame.pack(fill="x", pady=10)
-            
-            comp = comparisons["global"]
-            stats_text = f"""
-            Global Comparison:
-            ΓÇó Your Score: {comp['your_score']}
-            ΓÇó Global Average: {comp['avg_score']} (based on {comp['sample_size']:,} people)
-            ΓÇó Difference: {comp['difference']:+.1f}
-            ΓÇó Percentile Rank: {comp['percentile']:.1f}th percentile
-            """
-            
-            self.app.create_widget(
-                tk.Label,
-                stats_frame,
-                text=stats_text.strip(),
-                font=("Arial", 10),
-                justify="left",
-                anchor="w"
-            ).pack(anchor="w")
-        
-        # EQ Category Analysis (simulated)
-        categories_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        categories_frame.pack(fill="x", pady=20, padx=20)
-        
-        self.app.create_widget(
-            tk.Label,
-            categories_frame,
-            text="EQ Category Analysis",
-            font=("Arial", 14, "bold")
-        ).pack(anchor="w", pady=10)
-        
-        categories = ["Self-Awareness", "Self-Regulation", "Motivation", "Empathy", "Social Skills"]
-        for category in categories:
-            cat_frame = self.app.create_widget(tk.Frame, categories_frame)
-            cat_frame.pack(fill="x", pady=2)
-            
-            self.app.create_widget(
-                tk.Label,
-                cat_frame,
-                text=category,
-                font=("Arial", 10),
-                width=15,
-                anchor="w"
-            ).pack(side="left")
-            
-            # Simulated category score
-            cat_score = min(100, self.app.current_percentage + random.uniform(-10, 10))
-            cat_canvas = tk.Canvas(cat_frame, width=200, height=15, bg=self.app.colors["bg"], highlightthickness=0)
-            cat_canvas.pack(side="left", padx=10)
-            
-            cat_fill_width = (cat_score / 100) * 200
-            cat_color = self.app.colors["good"] if cat_score >= 70 else self.app.colors["average"] if cat_score >= 50 else self.app.colors["needs_work"]
-            
-            cat_canvas.create_rectangle(0, 0, 200, 15, fill="#e0e0e0", outline="")
-            cat_canvas.create_rectangle(0, 0, cat_fill_width, 15, fill=cat_color, outline="")
-            cat_canvas.create_text(100, 7, text=f"{cat_score:.0f}%", fill="white" if cat_score > 50 else "black", font=("Arial", 8))
-        
-        # Test summary
-        summary_text_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        summary_text_frame.pack(fill="x", pady=20, padx=20)
-        
-        summary_text = f"""
-        Test Summary:
-        ΓÇó Questions Answered: {len(self.app.responses)}/{len(self.app.questions)}
-        ΓÇó Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-        ΓÇó Age Group: {self.app.age_group if self.app.age_group else 'Not specified'}
-        ΓÇó Profession: {self.app.profession if self.app.profession else 'Not specified'}
-        ΓÇó Average Response: {self.app.current_score/len(self.app.responses):.1f} out of 4 if self.app.responses else 0
-        """
-        
-        self.app.create_widget(
-            tk.Label,
-            summary_text_frame,
-            text=summary_text.strip(),
-            font=("Arial", 10),
-            justify="left",
-            anchor="w"
-        ).pack(anchor="w")
-        
-        # Buttons frame
-        button_frame = self.app.create_widget(tk.Frame, scrollable_frame)
-        button_frame.pack(pady=20, padx=20)
-        
-        # Grid Layout for Buttons
-        # Row 0: AI Analysis (Center, Prominent)
-        if self.app.ml_predictor:
-            btn_ai = tk.Button(
-                button_frame,
-                text="≡ƒñû AI Analysis",
-                command=self.show_ml_analysis,
-                font=("Segoe UI", 12, "bold"),
-                bg="#1976D2",
-                fg="white",
-                activebackground="#1565C0",
-                activeforeground="white",
+            btn = tk.Button(
+                btn_frame,
+                text=text,
+                font=("Segoe UI", 11),
+                bg=color, fg="white",
+                activebackground=color, activeforeground="white",
                 relief="flat",
-                cursor="hand2",
-                width=20,
-                pady=8
+                cursor="hand2" if cmd else "arrow",
+                command=cmd if cmd else lambda: messagebox.showinfo("Info", "Feature not available"),
+                width=14, pady=8
             )
-            btn_ai.grid(row=0, column=0, columnspan=2, pady=(0, 15))
+            btn.grid(row=row, column=col, padx=6, pady=6)
             
-            def on_enter(e): btn_ai['bg'] = "#2196F3"
-            def on_leave(e): btn_ai['bg'] = "#1976D2"
-            btn_ai.bind("<Enter>", on_enter)
-            btn_ai.bind("<Leave>", on_leave)
-
-        # Row 1: Comparison & History
-        row1_frame = tk.Frame(button_frame)
-        row1_frame.grid(row=1, column=0, columnspan=2, pady=5)
+            if cmd:
+                btn.bind("<Enter>", lambda e, b=btn, c=color: b.configure(bg=self._lighten(c)))
+                btn.bind("<Leave>", lambda e, b=btn, c=color: b.configure(bg=c))
         
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        # Check if user has previous attempts
-        cursor.execute(
-            "SELECT COUNT(*) FROM scores WHERE username = ?",
-            (self.app.username,)
-        )
-        previous_count = cursor.fetchone()[0]
-        
-        if previous_count > 1:
-            self.app.create_widget(
-                tk.Button,
-                row1_frame,
-                text="Compare Previous",
-                command=self.show_comparison_screen,
-                font=("Arial", 11),
-                width=16
-            ).pack(side="left", padx=5)
-        
-        # Export PDF Button
-        if generate_pdf_report:
-            self.app.create_widget(
-                tk.Button,
-                row1_frame,
-                text="📄 Export Report",
-                command=self.export_results_pdf,
-                font=("Arial", 11),
-                bg=self.app.colors["button_bg"], # Use standard or specific? Let's use standard but distinct if possible.
-                fg=self.app.colors["button_fg"],
-                width=16
-            ).pack(side="left", padx=5)
-        
-        self.app.create_widget(
-            tk.Button,
-            row1_frame,
-            text="View History",
-            command=self.show_history_screen,
-            font=("Arial", 11),
-            width=16
-        ).pack(side="left", padx=5)
-        
-        # Row 2: Standard Actions
-        row2_frame = tk.Frame(button_frame)
-        row2_frame.grid(row=2, column=0, columnspan=2, pady=5)
-
-        self.app.create_widget(
-            tk.Button,
-            row2_frame,
-            text="Take Another",
-            command=self.reset_test,
-            font=("Arial", 11),
-            width=16
-        ).pack(side="left", padx=5)
-        
-        self.app.create_widget(
-            tk.Button,
-            row2_frame,
-            text="Main Menu",
+        # ===== BACK TO MENU BUTTON =====
+        tk.Button(
+            content,
+            text="← Back to Menu",
+            font=("Segoe UI", 11),
+            bg=colors.get("surface", "#1E293B"),
+            fg=colors.get("text_primary", "#F8FAFC"),
+            activebackground=colors.get("surface", "#1E293B"),
+            relief="flat",
+            cursor="hand2",
             command=self.app.create_welcome_screen,
-            font=("Arial", 11),
-            width=16
-        ).pack(side="left", padx=5)
+            width=20, pady=8
+        ).pack(pady=(25, 40))
         
-        # Pack canvas and scrollbar (unchanged)
+        # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+    
+    def _lighten(self, color):
+        """Lighten a hex color"""
+        try:
+            r = min(255, int(color[1:3], 16) + 25)
+            g = min(255, int(color[3:5], 16) + 25)
+            b = min(255, int(color[5:7], 16) + 25)
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except:
+            return color
+    
+    def show_detailed_analysis(self):
+        """Show detailed analysis page with progress bar, sentiment, benchmarks"""
+        # Create popup window
+        detail_win = tk.Toplevel(self.app.root)
+        detail_win.title("Detailed Analysis")
+        detail_win.geometry("800x600")
+        detail_win.configure(bg=self.app.colors.get("bg", "#0F172A"))
+        
+        # Center window
+        detail_win.update_idletasks()
+        x = self.app.root.winfo_x() + (self.app.root.winfo_width() - 800) // 2
+        y = self.app.root.winfo_y() + (self.app.root.winfo_height() - 600) // 2
+        detail_win.geometry(f"+{x}+{y}")
+        
+        colors = self.app.colors
+        
+        # Scrollable container
+        canvas = tk.Canvas(detail_win, bg=colors.get("bg", "#0F172A"), highlightthickness=0)
+        scrollbar = tk.Scrollbar(detail_win, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg=colors.get("bg", "#0F172A"))
+        
+        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable, anchor="nw", width=780)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Mouse wheel - bind only to this window's widgets
+        def _on_mousewheel(event):
+            try:
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            except:
+                pass
+        
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        scrollable.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Cleanup on close
+        def on_close():
+            try:
+                canvas.unbind("<MouseWheel>")
+                scrollable.unbind("<MouseWheel>")
+            except:
+                pass
+            detail_win.destroy()
+        
+        detail_win.protocol("WM_DELETE_WINDOW", on_close)
+        
+        # Header
+        tk.Label(
+            scrollable,
+            text="📈 Detailed Analysis",
+            font=("Segoe UI", 22, "bold"),
+            bg=colors.get("bg", "#0F172A"),
+            fg=colors.get("text_primary", "#F8FAFC")
+        ).pack(pady=20)
+        
+        # Get benchmark data
+        comparisons = self.get_benchmark_comparison()
+        
+        # === PROGRESS BAR SECTION ===
+        self._create_progress_section(scrollable, colors)
+        
+        # === SENTIMENT SECTION ===
+        if hasattr(self.app, 'sentiment_score') and self.app.sentiment_score is not None:
+            self._create_sentiment_section(scrollable, colors)
+        
+        # === BENCHMARK SECTION ===
+        if comparisons:
+            self._create_benchmark_section(scrollable, colors, comparisons)
+        
+        # === EQ CATEGORIES ===
+        self._create_categories_section(scrollable, colors)
+        
+        # Close button
+        tk.Button(
+            scrollable,
+            text="Close",
+            font=("Segoe UI", 12),
+            bg=colors.get("primary", "#3B82F6"),
+            fg="white",
+            relief="flat",
+            command=on_close,
+            width=15, pady=8
+        ).pack(pady=20)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+    
+    def _create_progress_section(self, parent, colors):
+        """Create EQ progress bar section"""
+        frame = tk.Frame(parent, bg=colors.get("surface", "#FFFFFF"))
+        frame.pack(fill="x", padx=20, pady=10)
+        
+        inner = tk.Frame(frame, bg=colors.get("surface", "#FFFFFF"))
+        inner.pack(fill="x", padx=20, pady=15)
+        
+        tk.Label(inner, text="EQ Score Progress", font=("Segoe UI", 14, "bold"),
+                 bg=colors.get("surface", "#FFFFFF"), fg=colors.get("text_primary", "#0F172A")).pack(anchor="w")
+        
+        # Progress bar
+        bar_canvas = tk.Canvas(inner, width=700, height=30, bg="#E5E7EB", highlightthickness=0)
+        bar_canvas.pack(pady=10)
+        
+        fill = (self.app.current_percentage / 100) * 700
+        if self.app.current_percentage >= 80:
+            bar_color = "#22C55E"
+        elif self.app.current_percentage >= 65:
+            bar_color = "#3B82F6"
+        elif self.app.current_percentage >= 50:
+            bar_color = "#F59E0B"
+        else:
+            bar_color = "#EF4444"
+        
+        bar_canvas.create_rectangle(0, 0, fill, 30, fill=bar_color, outline="")
+        bar_canvas.create_text(350, 15, text=f"{self.app.current_percentage:.1f}%", font=("Segoe UI", 12, "bold"), fill="white" if fill > 350 else "black")
+    
+    def _create_sentiment_section(self, parent, colors):
+        """Create sentiment analysis section"""
+        frame = tk.Frame(parent, bg=colors.get("surface", "#FFFFFF"))
+        frame.pack(fill="x", padx=20, pady=10)
+        
+        inner = tk.Frame(frame, bg=colors.get("surface", "#FFFFFF"))
+        inner.pack(fill="x", padx=20, pady=15)
+        
+        tk.Label(inner, text="Emotional Sentiment", font=("Segoe UI", 14, "bold"),
+                 bg=colors.get("surface", "#FFFFFF"), fg=colors.get("text_primary", "#0F172A")).pack(anchor="w")
+        
+        if self.app.sentiment_score > 20:
+            s_color, s_text = "#22C55E", "Positive"
+        elif self.app.sentiment_score < -20:
+            s_color, s_text = "#EF4444", "Negative"
+        else:
+            s_color, s_text = "#F59E0B", "Neutral"
+        
+        tk.Label(inner, text=f"{self.app.sentiment_score:+.1f} ({s_text})", font=("Segoe UI", 20, "bold"),
+                 bg=colors.get("surface", "#FFFFFF"), fg=s_color).pack(anchor="w", pady=5)
+    
+    def _create_benchmark_section(self, parent, colors, comparisons):
+        """Create benchmark analysis section"""
+        frame = tk.Frame(parent, bg=colors.get("surface", "#FFFFFF"))
+        frame.pack(fill="x", padx=20, pady=10)
+        
+        inner = tk.Frame(frame, bg=colors.get("surface", "#FFFFFF"))
+        inner.pack(fill="x", padx=20, pady=15)
+        
+        tk.Label(inner, text="Benchmark Analysis", font=("Segoe UI", 14, "bold"),
+                 bg=colors.get("surface", "#FFFFFF"), fg=colors.get("text_primary", "#0F172A")).pack(anchor="w")
+        
+        if "global" in comparisons:
+            comp = comparisons["global"]
+            tk.Label(inner, text=f"Your Score: {comp['your_score']} | Global Avg: {comp['avg_score']}",
+                     font=("Segoe UI", 12), bg=colors.get("surface", "#FFFFFF"),
+                     fg=colors.get("text_secondary", "#64748B")).pack(anchor="w", pady=5)
+            tk.Label(inner, text=f"Percentile: {comp['percentile']:.0f}th",
+                     font=("Segoe UI", 12, "bold"), bg=colors.get("surface", "#FFFFFF"),
+                     fg="#3B82F6").pack(anchor="w")
+    
+    def _create_categories_section(self, parent, colors):
+        """Create EQ categories section"""
+        frame = tk.Frame(parent, bg=colors.get("surface", "#FFFFFF"))
+        frame.pack(fill="x", padx=20, pady=10)
+        
+        inner = tk.Frame(frame, bg=colors.get("surface", "#FFFFFF"))
+        inner.pack(fill="x", padx=20, pady=15)
+        
+        tk.Label(inner, text="EQ Categories", font=("Segoe UI", 14, "bold"),
+                 bg=colors.get("surface", "#FFFFFF"), fg=colors.get("text_primary", "#0F172A")).pack(anchor="w", pady=(0, 10))
+        
+        categories = ["Self-Awareness", "Self-Regulation", "Motivation", "Empathy", "Social Skills"]
+        for cat in categories:
+            row = tk.Frame(inner, bg=colors.get("surface", "#FFFFFF"))
+            row.pack(fill="x", pady=3)
+            
+            tk.Label(row, text=cat, font=("Segoe UI", 11), width=15, anchor="w",
+                     bg=colors.get("surface", "#FFFFFF"), fg=colors.get("text_primary", "#0F172A")).pack(side="left")
+            
+            score = min(100, self.app.current_percentage + random.uniform(-10, 10))
+            bar = tk.Canvas(row, width=400, height=18, bg="#E5E7EB", highlightthickness=0)
+            bar.pack(side="left", padx=10)
+            
+            color = "#22C55E" if score >= 70 else "#F59E0B" if score >= 50 else "#EF4444"
+            bar.create_rectangle(0, 0, (score/100)*400, 18, fill=color, outline="")
+            bar.create_text(200, 9, text=f"{score:.0f}%", font=("Segoe UI", 9), fill="white" if score > 50 else "black")
 
     def show_ml_analysis(self):
         """Show AI-powered analysis in a popup window"""
@@ -707,33 +727,68 @@ class ResultsManager:
                 sentiment_score=self.app.sentiment_score
             )
             
+            colors = self.app.colors
+            
             # 2. Create Layout
             popup = tk.Toplevel(self.app.root)
-            popup.title("≡ƒñû SoulSense AI Analysis")
+            popup.title("🧠 SoulSense AI Analysis")
             popup.geometry("650x750")
-            popup.configure(bg="#F5F5F5")
+            popup.configure(bg=colors.get("bg", "#F5F5F5"))
 
             # Main Scrollable Frame
-            canvas = tk.Canvas(popup, bg="#F5F5F5")
+            canvas = tk.Canvas(popup, bg=colors.get("bg", "#F5F5F5"), highlightthickness=0)
             scrollbar = tk.Scrollbar(popup, orient="vertical", command=canvas.yview)
-            scrollable_frame = tk.Frame(canvas, bg="#F5F5F5")
+            scrollable_frame = tk.Frame(canvas, bg=colors.get("bg", "#F5F5F5"))
 
             scrollable_frame.bind(
                 "<Configure>",
                 lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
             )
 
-            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=630)
             canvas.configure(yscrollcommand=scrollbar.set)
+            
+            # Mouse wheel with focus handling
+            def _on_mousewheel(event):
+                try:
+                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                except tk.TclError:
+                    pass
+            
+            def _on_enter(event):
+                try:
+                    canvas.focus_set()
+                    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+                except tk.TclError:
+                    pass
+
+            def _on_leave(event):
+                try:
+                    canvas.unbind_all("<MouseWheel>")
+                except tk.TclError:
+                    pass
+
+            scrollable_frame.bind("<Enter>", _on_enter)
+            scrollable_frame.bind("<Leave>", _on_leave)
 
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
 
             # --- CARD 1: OVERVIEW ---
             risk_color = "#D32F2F" if result['prediction'] == 2 else "#FBC02D" if result['prediction'] == 1 else "#388E3C"
-            bg_color = "#FFEBEE" if result['prediction'] == 2 else "#FFFDE7" if result['prediction'] == 1 else "#E8F5E9"
+            # Adjust bg color based on theme
+            if self.app.current_theme == "dark":
+                bg_color = "#450a0a" if result['prediction'] == 2 else "#422006" if result['prediction'] == 1 else "#052e16"
+                card_bg = colors.get("surface", "#1E293B")
+                text_color = colors.get("text_primary", "#F8FAFC")
+                subtext_color = colors.get("text_secondary", "#94A3B8")
+            else:
+                bg_color = "#FFEBEE" if result['prediction'] == 2 else "#FFFDE7" if result['prediction'] == 1 else "#E8F5E9"
+                card_bg = "white"
+                text_color = "#333333"
+                subtext_color = "#555"
             
-            card1 = tk.Frame(scrollable_frame, bg="white", bd=1, relief="solid")
+            card1 = tk.Frame(scrollable_frame, bg=card_bg, bd=1, relief="solid")
             card1.pack(fill="x", padx=20, pady=10)
             
             # Header
@@ -760,14 +815,15 @@ class ResultsManager:
                 card1, 
                 text="Based on your inputs, the AI model suggests:", 
                 font=("Arial", 11, "italic"),
-                bg="white",
-                fg="#555"
+                bg=card_bg,
+                fg=subtext_color
             ).pack(pady=15)
 
             # --- CARD 2: ACTION PLAN ---
-            tk.Label(scrollable_frame, text="Γ£à RECOMMENDED ACTIONS", font=("Arial", 14, "bold"), bg="#F5F5F5", fg="#333").pack(anchor="w", padx=25, pady=(15,5))
+            tk.Label(scrollable_frame, text="RECOMMENDED ACTIONS", font=("Arial", 14, "bold"), 
+                     bg=colors.get("bg", "#F5F5F5"), fg=colors.get("text_primary", "#333")).pack(anchor="w", padx=25, pady=(15,5))
             
-            card2 = tk.Frame(scrollable_frame, bg="white", bd=0, highlightbackground="#ddd", highlightthickness=1)
+            card2 = tk.Frame(scrollable_frame, bg=card_bg, bd=0, highlightbackground=colors.get("border", "#ddd"), highlightthickness=1)
             card2.pack(fill="x", padx=20)
 
             if 'recommendations' in result and result['recommendations']:
@@ -789,9 +845,10 @@ class ResultsManager:
                 tk.Label(card2, text="No specific recommendations available.", bg="white").pack(pady=20)
 
             # --- CARD 3: TOP FACTORS ---
-            tk.Label(scrollable_frame, text="≡ƒöì INFLUENCING FACTORS", font=("Arial", 14, "bold"), bg="#F5F5F5", fg="#333").pack(anchor="w", padx=25, pady=(20,5))
+            tk.Label(scrollable_frame, text="INFLUENCING FACTORS", font=("Arial", 14, "bold"), 
+                     bg=colors.get("bg", "#F5F5F5"), fg=colors.get("text_primary", "#333")).pack(anchor="w", padx=25, pady=(20,5))
             
-            card3 = tk.Frame(scrollable_frame, bg="white", bd=0, highlightbackground="#ddd", highlightthickness=1)
+            card3 = tk.Frame(scrollable_frame, bg=card_bg, bd=0, highlightbackground=colors.get("border", "#ddd"), highlightthickness=1)
             card3.pack(fill="x", padx=20, pady=10)
 
             # Filter out non-5-point scale features for clean visualization
@@ -804,19 +861,19 @@ class ResultsManager:
                 imp = result['feature_importance'].get(feature, 0)
                 f_name = feature.replace('_', ' ').title()
                 
-                f_row = tk.Frame(card3, bg="white")
+                f_row = tk.Frame(card3, bg=card_bg)
                 f_row.pack(fill="x", pady=8, padx=15)
                 
                 # Label Row (Name + Value)
-                label_row = tk.Frame(f_row, bg="white")
+                label_row = tk.Frame(f_row, bg=card_bg)
                 label_row.pack(fill="x", pady=(0, 2))
                 
                 tk.Label(
                     label_row, 
                     text=f_name, 
                     font=("Segoe UI", 11, "bold"), 
-                    bg="white", 
-                    fg="#444"
+                    bg=card_bg, 
+                    fg=text_color
                 ).pack(side="left")
                 
                 # Format Score
@@ -832,8 +889,8 @@ class ResultsManager:
                     label_row, 
                     text=score_text, 
                     font=("Segoe UI", 11, "bold"), 
-                    bg="white", 
-                    fg="#666"
+                    bg=card_bg, 
+                    fg=subtext_color
                 ).pack(side="right")
                 
                 # Progress Bar

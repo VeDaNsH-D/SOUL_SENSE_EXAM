@@ -36,11 +36,24 @@ except ImportError:
 
 
 class AnalyticsDashboard:
-    def __init__(self, parent_root, username):
+    def __init__(self, parent_root, username, colors=None, theme="light"):
         self.parent_root = parent_root
         self.username = username
         self.benchmarks = self.load_benchmarks()
         self.i18n = get_i18n()
+        self.theme = theme
+        # Default colors for dark/light theme
+        if colors:
+            self.colors = colors
+        else:
+            self.colors = {
+                "bg": "#0F172A" if theme == "dark" else "#F8FAFC",
+                "surface": "#1E293B" if theme == "dark" else "#FFFFFF",
+                "text_primary": "#F8FAFC" if theme == "dark" else "#0F172A",
+                "text_secondary": "#94A3B8" if theme == "dark" else "#64748B",
+                "primary": "#3B82F6",
+                "border": "#334155" if theme == "dark" else "#E2E8F0"
+            }
 
     def load_benchmarks(self):
         """Load population benchmarks from JSON"""
@@ -51,26 +64,39 @@ class AnalyticsDashboard:
             return None
         
     def open_dashboard(self):
-        """Open analytics dashboard"""
+        """Open analytics dashboard with theme support"""
+        colors = self.colors
+        
         dashboard = tk.Toplevel(self.parent_root)
         dashboard.title(self.i18n.get("dashboard.title"))
-        dashboard.geometry("900x700")  # Increased size for new tab
+        dashboard.geometry("950x750")
+        dashboard.configure(bg=colors.get("bg", "#0F172A"))
         
-        tk.Label(dashboard, text=self.i18n.get("dashboard.analytics"), 
-                font=("Arial", 16, "bold")).pack(pady=10)
+        # Header
+        header = tk.Frame(dashboard, bg=colors.get("primary", "#3B82F6"))
+        header.pack(fill="x")
+        
+        tk.Label(
+            header,
+            text=f"📊 {self.i18n.get('dashboard.analytics')}", 
+            font=("Segoe UI", 18, "bold"),
+            bg=colors.get("primary", "#3B82F6"),
+            fg="white"
+        ).pack(pady=15)
+        
+        # Configure ttk style for dark/light theme
+        style = ttk.Style()
+        if self.theme == "dark":
+            style.configure("TNotebook", background=colors.get("bg", "#0F172A"))
+            style.configure("TFrame", background=colors.get("bg", "#0F172A"))
         
         notebook = ttk.Notebook(dashboard)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
-        # Correlation Analysis Tab (NEW from Upstream)
+        # Correlation Analysis Tab
         correlation_frame = ttk.Frame(notebook)
-
-        notebook.add(correlation_frame, text=self.i18n.get("dashboard.correlation_tab"))
-        self.show_correlation_analysis(correlation_frame)  # NEW METHOD
-
         notebook.add(correlation_frame, text="🔗 Correlation")
         self.show_correlation_analysis(correlation_frame)
-
             
         # EQ Trends
         eq_frame = ttk.Frame(notebook)
@@ -92,7 +118,7 @@ class AnalyticsDashboard:
         notebook.add(insights_frame, text=self.i18n.get("dashboard.insights_tab"))
         self.show_insights(insights_frame)
         
-        # Emotional Profile Clustering Tab (NEW)
+        # Emotional Profile Clustering Tab
         if CLUSTERING_AVAILABLE:
             clustering_frame = ttk.Frame(notebook)
             notebook.add(clustering_frame, text="🧬 Emotional Profile")
@@ -317,6 +343,16 @@ class AnalyticsDashboard:
     # ========== EXISTING METHODS (UPDATED) ==========
     def show_eq_trends(self, parent):
         """Show EQ score trends with matplotlib graph"""
+        # Set colors
+        colors = self.colors
+        bg_color = colors.get("bg", "#F8FAFC")
+        surface_color = colors.get("surface", "#FFFFFF")
+        text_primary = colors.get("text_primary", "#0F172A")
+        text_secondary = colors.get("text_secondary", "#64748B")
+        
+        # Configure parent
+        parent.configure(style="TFrame")
+        
         conn = get_connection()
         cursor = conn.cursor()
         try:
@@ -334,73 +370,80 @@ class AnalyticsDashboard:
             conn.close()
         
         if not data:
-            tk.Label(parent, text="No EQ data available", font=("Arial", 14)).pack(pady=50)
+            tk.Label(parent, text="No EQ data available", font=("Arial", 14), bg=bg_color, fg=text_primary).pack(pady=50)
             return
         
         scores = [row[0] for row in data]
         sentiment_scores = [row[3] if len(row) > 3 else None for row in data]
-        timestamps = []
-        
-        # Parse timestamps if available
-        for i, row in enumerate(data):
-            if len(row) > 1 and row[1]:
-                try:
-                    timestamps.append(datetime.strptime(row[1], "%Y-%m-%d %H:%M:%S"))
-                except:
-                    timestamps.append(datetime.now())
-            else:
-                timestamps.append(datetime.now())
         
         tk.Label(parent, text="📈 EQ Score Progress Over Time", 
-                font=("Arial", 14, "bold")).pack(pady=10)
+                font=("Segoe UI", 16, "bold"), bg=bg_color, fg=text_primary).pack(pady=(15, 10))
         
         # Stats frame
-        stats_frame = tk.Frame(parent, bg="#f0f0f0", relief=tk.RIDGE, bd=2)
+        stats_frame = tk.Frame(parent, bg=surface_color, relief=tk.RIDGE, bd=1,
+                              highlightbackground=colors.get("border", "#E2E8F0"), highlightthickness=1)
         stats_frame.pack(fill=tk.X, padx=20, pady=10)
         
         # Create two columns for stats
-        left_col = tk.Frame(stats_frame, bg="#f0f0f0")
-        left_col.pack(side=tk.LEFT, padx=20, pady=10)
+        left_col = tk.Frame(stats_frame, bg=surface_color)
+        left_col.pack(side=tk.LEFT, padx=30, pady=15, expand=True)
         
-        right_col = tk.Frame(stats_frame, bg="#f0f0f0")
-        right_col.pack(side=tk.LEFT, padx=20, pady=10)
+        right_col = tk.Frame(stats_frame, bg=surface_color)
+        right_col.pack(side=tk.LEFT, padx=30, pady=15, expand=True)
         
         tk.Label(left_col, text=f"Total Attempts: {len(scores)}", 
-                font=("Arial", 11, "bold"), bg="#f0f0f0").pack(anchor="w", pady=2)
+                font=("Segoe UI", 11, "bold"), bg=surface_color, fg=text_primary).pack(anchor="w", pady=2)
         tk.Label(left_col, text=f"Latest Score: {scores[-1]}", 
-                font=("Arial", 11), bg="#f0f0f0").pack(anchor="w", pady=2)
+                font=("Segoe UI", 11), bg=surface_color, fg=text_primary).pack(anchor="w", pady=2)
         tk.Label(left_col, text=f"Best Score: {max(scores)}", 
-                font=("Arial", 11), bg="#f0f0f0", fg="green").pack(anchor="w", pady=2)
+                font=("Segoe UI", 11), bg=surface_color, fg="#22C55E").pack(anchor="w", pady=2)
         
         tk.Label(right_col, text=f"First Score: {scores[0]}", 
-                font=("Arial", 11), bg="#f0f0f0").pack(anchor="w", pady=2)
+                font=("Segoe UI", 11), bg=surface_color, fg=text_primary).pack(anchor="w", pady=2)
         tk.Label(right_col, text=f"Average Score: {sum(scores)/len(scores):.1f}", 
-                font=("Arial", 11), bg="#f0f0f0").pack(anchor="w", pady=2)
+                font=("Segoe UI", 11), bg=surface_color, fg=text_primary).pack(anchor="w", pady=2)
         
         if len(scores) > 1:
             improvement = scores[-1] - scores[0]
             improvement_pct = (improvement / scores[0]) * 100 if scores[0] != 0 else 0
-            color = "green" if improvement > 0 else "red" if improvement < 0 else "blue"
+            color = "#22C55E" if improvement > 0 else "#EF4444" if improvement < 0 else "#3B82F6"
             symbol = "↑" if improvement > 0 else "↓" if improvement < 0 else "→"
             tk.Label(right_col, text=f"Progress: {symbol} {improvement:+d} ({improvement_pct:+.1f}%)", 
-                    font=("Arial", 11, "bold"), bg="#f0f0f0", fg=color).pack(anchor="w", pady=2)
+                    font=("Segoe UI", 11, "bold"), bg=surface_color, fg=color).pack(anchor="w", pady=2)
         
         # Create matplotlib figure
-        fig = Figure(figsize=(6, 4), dpi=80)
+        plt.style.use('dark_background' if self.theme == 'dark' else 'default')
+        if self.theme == 'dark':
+            fig_bg = '#1E293B' # Surface color for dark mode chart
+            plot_bg = '#1E293B'
+            text_color = '#F8FAFC'
+            grid_color = '#334155'
+        else:
+            fig_bg = '#F8FAFC'
+            plot_bg = '#F8FAFC'
+            text_color = '#0F172A'
+            grid_color = '#E2E8F0'
+
+        fig = Figure(figsize=(6, 4), dpi=80, facecolor=fig_bg)
         ax1 = fig.add_subplot(111)
+        ax1.set_facecolor(plot_bg)
         
         # Plot EQ Score
         l1, = ax1.plot(range(1, len(scores) + 1), scores, 
                marker='o', linestyle='-', linewidth=2, markersize=8,
-               color='#4CAF50', markerfacecolor='#2196F3', 
-               markeredgewidth=2, markeredgecolor='#1976D2', label="EQ Score")
+               color='#22C55E', markerfacecolor='#22C55E', 
+               markeredgewidth=2, markeredgecolor='white', label="EQ Score")
         
-        ax1.set_xlabel('Attempt Number', fontsize=11, fontweight='bold')
-        ax1.set_ylabel('EQ Score', fontsize=11, fontweight='bold', color='#4CAF50')
-        ax1.tick_params(axis='y', labelcolor='#4CAF50')
-        ax1.set_title('EQ Score & Emotional Sentiment Trends', fontsize=12, fontweight='bold', pad=15)
-        ax1.grid(True, alpha=0.3, linestyle='--')
+        ax1.set_xlabel('Attempt Number', fontsize=11, fontweight='bold', color=text_color)
+        ax1.set_ylabel('EQ Score', fontsize=11, fontweight='bold', color='#22C55E')
+        ax1.tick_params(axis='y', labelcolor='#22C55E', colors=text_color)
+        ax1.tick_params(axis='x', colors=text_color)
+        ax1.set_title('EQ Score & Emotional Sentiment Trends', fontsize=12, fontweight='bold', pad=15, color=text_color)
+        ax1.grid(True, alpha=0.3, linestyle='--', color=grid_color)
         ax1.set_xticks(range(1, len(scores) + 1))
+        
+        for spine in ax1.spines.values():
+            spine.set_color(grid_color)
         
         # Plot Sentiment Score (Secondary Axis)
         if sentiment_scores and any(s is not None and s != 0 for s in sentiment_scores):
@@ -412,12 +455,15 @@ class AnalyticsDashboard:
             
             l2, = ax2.plot(valid_x, valid_y, 
                      marker='s', linestyle='--', linewidth=2, markersize=6,
-                     color='#FF9800', markerfacecolor='#FFC107',
-                     markeredgewidth=2, markeredgecolor='#E64A19', label="Sentiment")
+                     color='#F59E0B', markerfacecolor='#F59E0B',
+                     markeredgewidth=2, markeredgecolor='white', label="Sentiment")
                      
-            ax2.set_ylabel('Sentiment Score (-100 to +100)', fontsize=11, fontweight='bold', color='#FF9800')
-            ax2.tick_params(axis='y', labelcolor='#FF9800')
+            ax2.set_ylabel('Sentiment Score (-100 to +100)', fontsize=11, fontweight='bold', color='#F59E0B')
+            ax2.tick_params(axis='y', labelcolor='#F59E0B', colors=text_color)
             ax2.set_ylim(-110, 110)
+            
+            for spine in ax2.spines.values():
+                spine.set_color(grid_color)
             
             # Combined Legend
             lines = [l1, l2]
