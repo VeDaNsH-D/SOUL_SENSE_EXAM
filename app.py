@@ -1,12 +1,199 @@
 import sqlite3
 import tkinter as tk
-from tkinter import messagebox, font, ttk
-from journal_feature import JournalFeature
-from analytics_dashboard import AnalyticsDashboard
-from datetime import datetime
+from tkinter import messagebox
+import time
+import winsound
 
-# DATABASE SETUP
-conn = sqlite3.connect("soulsense_db")
+# ========== SETTINGS FEATURE ADDED HERE ==========
+# Global settings
+CURRENT_THEME = "light"
+QUESTION_COUNT = 5
+SOUND_ENABLED = True
+
+# Theme colors
+THEMES = {
+    "light": {
+        "bg": "#f0f4f8",
+        "text": "#333333",
+        "primary": "#4CAF50",
+        "warning": "#E53935",
+        "secondary": "#2196F3",
+        "accent": "#FF9800",
+        "header_bg": "#1E1E2F",
+        "header_fg": "white",
+        "timer": "#1E88E5"
+    },
+    "dark": {
+        "bg": "#121212",
+        "text": "#ffffff",
+        "primary": "#4CAF50",
+        "warning": "#E53935",
+        "secondary": "#2196F3",
+        "accent": "#FF9800",
+        "header_bg": "#0a0a15",
+        "header_fg": "white",
+        "timer": "#64B5F6"
+    }
+}
+
+def get_theme():
+    return THEMES[CURRENT_THEME]
+
+def apply_theme_to_window(window):
+    """Apply current theme to a window and all its widgets"""
+    theme = get_theme()
+    window.configure(bg=theme["bg"])
+    
+    # Apply to all widgets in window
+    for widget in window.winfo_children():
+        widget_type = widget.winfo_class()
+        try:
+            if widget_type == "Label":
+                if widget.cget("bg") in ["#1E1E2F", "#0a0a15"]:
+                    widget.configure(bg=theme["header_bg"], fg=theme["header_fg"])
+                elif widget.cget("fg") == "#1E88E5":
+                    widget.configure(bg=theme["bg"], fg=theme["timer"])
+                else:
+                    widget.configure(bg=theme["bg"], fg=theme["text"])
+            elif widget_type == "Button":
+                current_bg = widget.cget("bg")
+                if current_bg == "#4CAF50":
+                    widget.configure(bg=theme["primary"], fg="white")
+                elif current_bg == "#E53935":
+                    widget.configure(bg=theme["warning"], fg="white")
+                elif current_bg == "#2196F3":
+                    widget.configure(bg=theme["secondary"], fg="white")
+                elif current_bg == "#FF9800":
+                    widget.configure(bg=theme["accent"], fg="white")
+                elif current_bg == "#757575":
+                    widget.configure(bg="#757575", fg="white")
+            elif widget_type == "Entry":
+                widget.configure(bg="white" if CURRENT_THEME == "light" else "#2d2d2d", 
+                               fg=theme["text"])
+            elif widget_type == "Radiobutton":
+                widget.configure(bg=theme["bg"], fg=theme["text"])
+            elif widget_type == "Scale":
+                widget.configure(bg=theme["bg"], fg=theme["text"])
+        except:
+            pass
+
+def play_sound(sound_type):
+    if not SOUND_ENABLED:
+        return
+    try:
+        if sound_type == "click": winsound.Beep(1000, 100)
+        elif sound_type == "success": winsound.Beep(1500, 200)
+        elif sound_type == "error": winsound.Beep(800, 300)
+    except: 
+        pass
+
+def open_settings(parent_window):
+    settings = tk.Toplevel(parent_window)
+    settings.title("Settings")
+    settings.geometry("400x450")
+    settings.resizable(False, False)
+    
+    theme = get_theme()
+    settings.configure(bg=theme["bg"])
+    
+    tk.Label(settings, text="⚙️ Settings", font=("Arial", 22, "bold"), 
+             bg=theme["bg"], fg=theme["text"]).pack(pady=20)
+    
+    # Theme toggle
+    tk.Label(settings, text="Theme:", font=("Arial", 12), 
+             bg=theme["bg"], fg=theme["text"]).pack()
+    
+    def toggle_theme():
+        global CURRENT_THEME
+        CURRENT_THEME = "dark" if CURRENT_THEME == "light" else "light"
+        play_sound("click")
+        
+        # Apply theme to settings window
+        new_theme = get_theme()
+        settings.configure(bg=new_theme["bg"])
+        for widget in settings.winfo_children():
+            try:
+                if widget.winfo_class() == "Label":
+                    widget.configure(bg=new_theme["bg"], fg=new_theme["text"])
+                elif widget.winfo_class() == "Button":
+                    current_bg = widget.cget("bg")
+                    if current_bg == "#4CAF50":
+                        widget.configure(bg=new_theme["primary"])
+                    elif current_bg == "#2196F3":
+                        widget.configure(bg=new_theme["secondary"])
+                    elif current_bg == "#757575":
+                        widget.configure(bg="#757575")
+                elif widget.winfo_class() == "Scale":
+                    widget.configure(bg=new_theme["bg"], fg=new_theme["text"])
+            except:
+                pass
+        
+        # Apply theme to parent window
+        apply_theme_to_window(parent_window)
+        
+        messagebox.showinfo("Theme Changed", 
+                          f"{CURRENT_THEME.capitalize()} theme applied successfully!")
+    
+    tk.Button(settings, text="☀️ Toggle Light/Dark", command=toggle_theme, 
+              bg=theme["primary"], fg="white", font=("Arial", 11), 
+              width=20).pack(pady=5)
+    
+    # Question count
+    tk.Label(settings, text="Question Count:", font=("Arial", 12), 
+             bg=theme["bg"], fg=theme["text"]).pack(pady=(10,0))
+    
+    count_value = tk.StringVar(value=str(QUESTION_COUNT))
+    
+    def update_count(val):
+        global QUESTION_COUNT
+        QUESTION_COUNT = int(float(val))
+        count_value.set(str(QUESTION_COUNT))
+        play_sound("click")
+    
+    scale = tk.Scale(settings, from_=3, to=5, orient="horizontal", 
+                    command=update_count, bg=theme["bg"], fg=theme["text"], 
+                    length=150)
+    scale.set(QUESTION_COUNT)
+    scale.pack()
+    
+    tk.Label(settings, textvariable=count_value, font=("Arial", 12, "bold"), 
+             bg=theme["bg"], fg=theme["primary"]).pack()
+    
+    # Sound toggle
+    tk.Label(settings, text="Sound:", font=("Arial", 12), 
+             bg=theme["bg"], fg=theme["text"]).pack(pady=(10,0))
+    
+    def toggle_sound():
+        global SOUND_ENABLED
+        SOUND_ENABLED = not SOUND_ENABLED
+        play_sound("click")
+        status = "enabled" if SOUND_ENABLED else "disabled"
+        messagebox.showinfo("Sound", f"Sound effects {status}!")
+    
+    tk.Button(settings, text="🔊 Toggle Sound", command=toggle_sound, 
+              bg=theme["secondary"], fg="white", font=("Arial", 11), 
+              width=20).pack(pady=5)
+    
+    tk.Button(settings, text="Close", command=settings.destroy, 
+              bg="#757575", fg="white", font=("Arial", 12), 
+              width=15).pack(pady=20)
+# ========== END OF SETTINGS FEATURE ==========
+
+#RETRY MECHANISM
+def retry_operation(operation, retries=3, delay=0.5, backoff=2):
+    attempt = 0
+    while attempt < retries:
+        try:
+            return operation()
+        except (sqlite3.OperationalError, IOError):
+            attempt += 1
+            if attempt == retries:
+                raise
+            time.sleep(delay)
+            delay *= backoff
+
+#DATABASE SETUP
+conn = sqlite3.connect("soulsense_db.db")
 cursor = conn.cursor()
 
 cursor.execute("""
@@ -15,18 +202,21 @@ CREATE TABLE IF NOT EXISTS scores (
     username TEXT,
     age INTEGER,
     total_score INTEGER,
-    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+
+    avg_response REAL,
+    max_response INTEGER,
+    min_response INTEGER,
+    score_variance REAL,
+
+    questions_attempted INTEGER,
+    completion_ratio REAL,
+    avg_time_per_question REAL,
+    time_taken_seconds INTEGER
 )
 """)
-
-try:
-    cursor.execute("ALTER TABLE scores ADD COLUMN age INTEGER")
-except sqlite3.OperationalError:
-    pass
-
 conn.commit()
 
-# QUESTIONS
+#QUESTIONS
 questions = [
     {"text": "You can recognize your emotions as they happen.", "age_min": 12, "age_max": 25},
     {"text": "You find it easy to understand why you feel a certain way.", "age_min": 14, "age_max": 30},
@@ -35,1129 +225,302 @@ questions = [
     {"text": "You are aware of how your emotions affect others.", "age_min": 16, "age_max": 40}
 ]
 
-# Custom colors - Light Theme
-LIGHT_THEME = {
-    "primary": "#4CAF50",
-    "secondary": "#2196F3",
-    "accent": "#FF9800",
-    "success": "#4CAF50",
-    "warning": "#FF9800",
-    "light_bg": "#f0f4f8",
-    "card_bg": "#ffffff",
-    "text": "#333333",
-    "subtext": "#666666",
-    "border": "#e0e0e0",
-    "analytics": "#9C27B0",
-    "correlation": "#E91E63",
-    "insights": "#009688",
-    "white": "#FFFFFF",
-    "light_white": "#F8F9FA",
-    "settings_bg": "#ffffff",
-    "toggle_bg": "#e0e0e0",
-    "toggle_fg": "#333333"
-}
-
-# Dark Theme
-DARK_THEME = {
-    "primary": "#4CAF50",
-    "secondary": "#2196F3",
-    "accent": "#FF9800",
-    "success": "#4CAF50",
-    "warning": "#FF9800",
-    "light_bg": "#121212",
-    "card_bg": "#1e1e1e",
-    "text": "#ffffff",
-    "subtext": "#b0b0b0",
-    "border": "#333333",
-    "analytics": "#BA68C8",
-    "correlation": "#F06292",
-    "insights": "#4DB6AC",
-    "white": "#1e1e1e",
-    "light_white": "#2d2d2d",
-    "settings_bg": "#1e1e1e",
-    "toggle_bg": "#333333",
-    "toggle_fg": "#ffffff"
-}
-
-# Global settings
-CURRENT_THEME = LIGHT_THEME
-QUESTION_COUNT = 5  # Default question count
-SOUND_ENABLED = True
-
-def apply_theme_to_widget(widget, theme):
-    """Recursively apply theme to all widgets"""
-    widget_type = widget.winfo_class()
-    
-    try:
-        if widget_type == "Tk" or widget_type == "Toplevel" or widget_type == "Frame":
-            if "bg" in widget.configure():
-                widget.configure(bg=theme["light_bg"])
-        elif widget_type == "Label":
-            if "bg" in widget.configure():
-                widget.configure(bg=theme.get("bg", theme["light_bg"]), fg=theme["text"])
-        elif widget_type == "Button":
-            if "bg" in widget.configure():
-                current_bg = widget.cget("bg")
-                # Preserve special button colors
-                if current_bg in [LIGHT_THEME["primary"], LIGHT_THEME["secondary"], LIGHT_THEME["accent"], 
-                                 LIGHT_THEME["analytics"], LIGHT_THEME["correlation"], LIGHT_THEME["insights"],
-                                 "#607D8B", "#757575", "#B0BEC5"]:
-                    # Keep original color but update text
-                    widget.configure(fg="white")
-                else:
-                    widget.configure(bg=theme["card_bg"], fg=theme["text"])
-        elif widget_type == "Entry":
-            widget.configure(bg=theme["card_bg"], fg=theme["text"], insertbackground=theme["text"])
-        elif widget_type == "Radiobutton":
-            widget.configure(bg=theme["card_bg"], fg=theme["text"], 
-                           selectcolor=theme["primary"], activebackground=theme["card_bg"],
-                           activeforeground=theme["text"])
-        elif widget_type == "Canvas":
-            widget.configure(bg=theme.get("bg", theme["light_bg"]))
-        elif widget_type == "Checkbutton":
-            widget.configure(bg=theme["light_bg"], fg=theme["text"], 
-                           selectcolor=theme["primary"], activebackground=theme["light_bg"],
-                           activeforeground=theme["text"])
-        elif widget_type == "Scale":
-            widget.configure(bg=theme["light_bg"], fg=theme["text"])
-    except:
-        pass
-    
-    # Apply to children
-    for child in widget.winfo_children():
-        apply_theme_to_widget(child, theme)
-
-def open_settings():
-    """Open settings window"""
-    settings_window = tk.Toplevel(root)
-    settings_window.title("Settings - SoulSense")
-    settings_window.geometry("500x500")
-    settings_window.resizable(False, False)
-    settings_window.configure(bg=CURRENT_THEME["light_bg"])
-    
-    # Header
-    header_frame = tk.Frame(settings_window, bg=CURRENT_THEME["primary"], height=70)
-    header_frame.pack(fill="x", pady=(0, 20))
-    header_frame.pack_propagate(False)
-    
-    tk.Label(
-        header_frame,
-        text="⚙️ Settings",
-        font=("Arial", 22, "bold"),
-        bg=CURRENT_THEME["primary"],
-        fg="white"
-    ).pack(pady=20)
-    
-    # Main content
-    content_frame = tk.Frame(settings_window, bg=CURRENT_THEME["light_bg"], padx=40, pady=20)
-    content_frame.pack(fill="both", expand=True)
-    
-    # Theme Settings
-    theme_frame = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"], relief="solid", borderwidth=1, padx=20, pady=20)
-    theme_frame.pack(fill="x", pady=(0, 20))
-    
-    tk.Label(
-        theme_frame,
-        text="Theme Settings",
-        font=("Arial", 16, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(anchor="w", pady=(0, 15))
-    
-    # Theme toggle
-    theme_toggle_frame = tk.Frame(theme_frame, bg=CURRENT_THEME["card_bg"])
-    theme_toggle_frame.pack(fill="x", pady=5)
-    
-    tk.Label(
-        theme_toggle_frame,
-        text="Theme:",
-        font=("Arial", 12),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(side="left", padx=(0, 20))
-    
-    def toggle_theme():
-        global CURRENT_THEME
-        if CURRENT_THEME == LIGHT_THEME:
-            CURRENT_THEME = DARK_THEME
-            theme_btn.config(text="🌙 Dark Theme")
-        else:
-            CURRENT_THEME = LIGHT_THEME
-            theme_btn.config(text="☀️ Light Theme")
-        
-        # Apply theme to settings window
-        apply_theme_to_widget(settings_window, CURRENT_THEME)
-        
-        # Apply theme to main window
-        apply_theme_to_widget(root, CURRENT_THEME)
-        
-        messagebox.showinfo("Theme Changed", "Theme applied successfully!")
-    
-    theme_btn = tk.Button(
-        theme_toggle_frame,
-        text="☀️ Light Theme" if CURRENT_THEME == LIGHT_THEME else "🌙 Dark Theme",
-        command=toggle_theme,
-        bg=CURRENT_THEME["primary"],
-        fg="white",
-        font=("Arial", 11, "bold"),
-        relief="flat",
-        padx=20,
-        pady=8,
-        cursor="hand2"
-    )
-    theme_btn.pack(side="left")
-    
-    # Question Count Settings
-    question_frame = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"], relief="solid", borderwidth=1, padx=20, pady=20)
-    question_frame.pack(fill="x", pady=(0, 20))
-    
-    tk.Label(
-        question_frame,
-        text="Assessment Settings",
-        font=("Arial", 16, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(anchor="w", pady=(0, 15))
-    
-    # Question count slider
-    count_frame = tk.Frame(question_frame, bg=CURRENT_THEME["card_bg"])
-    count_frame.pack(fill="x", pady=5)
-    
-    tk.Label(
-        count_frame,
-        text="Question Count:",
-        font=("Arial", 12),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(side="left", padx=(0, 20))
-    
-    count_value = tk.StringVar(value=str(QUESTION_COUNT))
-    
-    def update_question_count(val):
-        global QUESTION_COUNT
-        QUESTION_COUNT = int(float(val))
-        count_value.set(str(QUESTION_COUNT))
-    
-    count_slider = tk.Scale(
-        count_frame,
-        from_=3,
-        to=len(questions),
-        orient="horizontal",
-        length=200,
-        command=update_question_count,
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"],
-        highlightbackground=CURRENT_THEME["light_bg"],
-        troughcolor=CURRENT_THEME["border"],
-        sliderrelief="flat"
-    )
-    count_slider.set(QUESTION_COUNT)
-    count_slider.pack(side="left", padx=(0, 10))
-    
-    count_label = tk.Label(
-        count_frame,
-        textvariable=count_value,
-        font=("Arial", 12, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["primary"],
-        width=3
-    )
-    count_label.pack(side="left")
-    
-    tk.Label(
-        count_frame,
-        text="questions",
-        font=("Arial", 11),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(side="left", padx=(5, 0))
-    
-    # Sound Settings
-    sound_frame = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"], relief="solid", borderwidth=1, padx=20, pady=20)
-    sound_frame.pack(fill="x", pady=(0, 20))
-    
-    tk.Label(
-        sound_frame,
-        text="Sound Settings",
-        font=("Arial", 16, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(anchor="w", pady=(0, 15))
-    
-    # Sound toggle
-    sound_toggle_frame = tk.Frame(sound_frame, bg=CURRENT_THEME["card_bg"])
-    sound_toggle_frame.pack(fill="x", pady=5)
-    
-    tk.Label(
-        sound_toggle_frame,
-        text="Sound Effects:",
-        font=("Arial", 12),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(side="left", padx=(0, 20))
-    
-    def toggle_sound():
-        global SOUND_ENABLED
-        SOUND_ENABLED = not SOUND_ENABLED
-        if SOUND_ENABLED:
-            sound_btn.config(text="🔊 ON")
-            messagebox.showinfo("Sound", "Sound effects enabled!")
-        else:
-            sound_btn.config(text="🔇 OFF")
-            messagebox.showinfo("Sound", "Sound effects disabled!")
-    
-    sound_btn = tk.Button(
-        sound_toggle_frame,
-        text="🔊 ON" if SOUND_ENABLED else "🔇 OFF",
-        command=toggle_sound,
-        bg=CURRENT_THEME["secondary"] if SOUND_ENABLED else "#757575",
-        fg="white",
-        font=("Arial", 11, "bold"),
-        relief="flat",
-        padx=20,
-        pady=8,
-        cursor="hand2"
-    )
-    sound_btn.pack(side="left")
-    
-    # Bottom buttons
-    bottom_frame = tk.Frame(content_frame, bg=CURRENT_THEME["light_bg"])
-    bottom_frame.pack(fill="x", pady=(10, 0))
-    
-    def save_settings():
-        messagebox.showinfo("Settings Saved", "Your settings have been saved successfully!")
-        settings_window.destroy()
-    
-    tk.Button(
-        bottom_frame,
-        text="💾 Save Settings",
-        command=save_settings,
-        bg=CURRENT_THEME["primary"],
-        fg="white",
-        font=("Arial", 12, "bold"),
-        relief="flat",
-        padx=25,
-        pady=10,
-        cursor="hand2"
-    ).pack(side="left", padx=5)
-    
-    def reset_settings():
-        global QUESTION_COUNT, SOUND_ENABLED, CURRENT_THEME
-        QUESTION_COUNT = 5
-        SOUND_ENABLED = True
-        CURRENT_THEME = LIGHT_THEME
-        messagebox.showinfo("Settings Reset", "All settings have been reset to defaults!")
-        settings_window.destroy()
-    
-    tk.Button(
-        bottom_frame,
-        text="🔄 Reset to Defaults",
-        command=reset_settings,
-        bg=CURRENT_THEME["accent"],
-        fg="white",
-        font=("Arial", 12),
-        relief="flat",
-        padx=25,
-        pady=10,
-        cursor="hand2"
-    ).pack(side="left", padx=5)
-    
-    def close_settings():
-        settings_window.destroy()
-    
-    tk.Button(
-        bottom_frame,
-        text="Close",
-        command=close_settings,
-        bg="#757575",
-        fg="white",
-        font=("Arial", 12),
-        relief="flat",
-        padx=25,
-        pady=10,
-        cursor="hand2"
-    ).pack(side="right", padx=5)
-
-def show_analysis_complete(username, score, age, total_questions):
-    """Show the completion screen as a main window"""
-    analysis_window = tk.Tk()
-    analysis_window.title("Analysis & Insights - SoulSense")
-    
-    # Get screen dimensions
-    screen_width = analysis_window.winfo_screenwidth()
-    screen_height = analysis_window.winfo_screenheight()
-    
-    # Set to nearly full screen (95% of screen)
-    window_width = int(screen_width * 0.95)
-    window_height = int(screen_height * 0.95)
-    
-    analysis_window.geometry(f"{window_width}x{window_height}")
-    analysis_window.configure(bg=CURRENT_THEME["light_bg"])
-    
-    # Make window resizable
-    analysis_window.resizable(True, True)
-    
-    # Center the window
-    x = (screen_width - window_width) // 2
-    y = (screen_height - window_height) // 2
-    analysis_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
-    
-    # Create main container with Canvas and Scrollbar
-    main_container = tk.Frame(analysis_window, bg=CURRENT_THEME["light_bg"])
-    main_container.pack(fill="both", expand=True)
-    
-    # Create a canvas for scrolling
-    canvas = tk.Canvas(main_container, bg=CURRENT_THEME["light_bg"], highlightthickness=0)
-    scrollbar = tk.Scrollbar(main_container, orient="vertical", command=canvas.yview)
-    
-    # Create a frame inside the canvas for content
-    content_frame = tk.Frame(canvas, bg=CURRENT_THEME["light_bg"])
-    
-    # Configure canvas scrolling
-    canvas.configure(yscrollcommand=scrollbar.set)
-    
-    # Pack canvas and scrollbar
-    canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
-    
-    # Put the content frame in the canvas
-    canvas_window = canvas.create_window((0, 0), window=content_frame, anchor="nw")
-    
-    # Update scrollregion when content frame size changes
-    def configure_scroll_region(event):
-        canvas.configure(scrollregion=canvas.bbox("all"))
-    
-    content_frame.bind("<Configure>", configure_scroll_region)
-    
-    # Also update canvas window width
-    def configure_canvas_window(event):
-        canvas.itemconfig(canvas_window, width=event.width)
-    
-    canvas.bind("<Configure>", configure_canvas_window)
-    
-    # Header
-    header_frame = tk.Frame(content_frame, bg=CURRENT_THEME["primary"])
-    header_frame.pack(fill="x", pady=(0, 30))
-    
-    header_content = tk.Frame(header_frame, bg=CURRENT_THEME["primary"], padx=min(100, window_width//10), pady=30)
-    header_content.pack(fill="x")
-    
-    tk.Label(
-        header_content,
-        text="🎉 Assessment Complete!",
-        font=("Arial", 28, "bold"),
-        bg=CURRENT_THEME["primary"],
-        fg="white"
-    ).pack(pady=(0, 10))
-    
-    tk.Label(
-        header_content,
-        text=f"Congratulations {username}! Your emotional intelligence journey begins.",
-        font=("Arial", 14),
-        bg=CURRENT_THEME["primary"],
-        fg=CURRENT_THEME["light_white"]
-    ).pack()
-    
-    # Main content area
-    main_content = tk.Frame(content_frame, bg=CURRENT_THEME["light_bg"], padx=min(80, window_width//12), pady=20)
-    main_content.pack(fill="both", expand=True)
-    
-    # Congratulations message
-    tk.Label(
-        main_content,
-        text="Your Results Are Ready",
-        font=("Arial", 22, "bold"),
-        bg=CURRENT_THEME["light_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(anchor="w", pady=(0, 10))
-    
-    tk.Label(
-        main_content,
-        text="Explore detailed insights and analysis options below:",
-        font=("Arial", 14),
-        bg=CURRENT_THEME["light_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(anchor="w", pady=(0, 30))
-    
-    # Score Summary Card
-    score_card = tk.Frame(main_content, bg=CURRENT_THEME["card_bg"], relief="solid", borderwidth=1)
-    score_card.pack(fill="x", pady=(0, 40))
-    
-    score_inner = tk.Frame(score_card, bg=CURRENT_THEME["card_bg"], padx=40, pady=40)
-    score_inner.pack(fill="both", expand=True)
-    
-    tk.Label(
-        score_inner,
-        text="Your EQ Score Summary",
-        font=("Arial", 24, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(pady=(0, 20))
-    
-    # Score display in center
-    score_display_frame = tk.Frame(score_inner, bg=CURRENT_THEME["card_bg"])
-    score_display_frame.pack(pady=20)
-    
-    tk.Label(
-        score_display_frame,
-        text=f"{score}",
-        font=("Arial", 48, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["primary"]
-    ).pack(side="left")
-    
-    tk.Label(
-        score_display_frame,
-        text=f" / {total_questions * 5}",
-        font=("Arial", 32),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(side="left", padx=(10, 0), pady=(15, 0))
-    
-    # Average score
-    avg_score = score / total_questions
-    avg_frame = tk.Frame(score_inner, bg=CURRENT_THEME["card_bg"])
-    avg_frame.pack(pady=10)
-    
-    tk.Label(
-        avg_frame,
-        text="Average Score: ",
-        font=("Arial", 16),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(side="left")
-    
-    tk.Label(
-        avg_frame,
-        text=f"{avg_score:.1f}",
-        font=("Arial", 18, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["primary"]
-    ).pack(side="left", padx=(5, 0))
-    
-    tk.Label(
-        avg_frame,
-        text=" per question",
-        font=("Arial", 16),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(side="left", padx=(5, 0))
-    
-    # Score interpretation
-    if avg_score >= 4.0:
-        interpretation = "🌟 Excellent emotional awareness and regulation skills!"
-        interpretation_color = CURRENT_THEME["success"]
-    elif avg_score >= 3.0:
-        interpretation = "👍 Good emotional intelligence with solid foundation!"
-        interpretation_color = "#FFA000"
-    else:
-        interpretation = "📈 Great opportunity for emotional intelligence growth!"
-        interpretation_color = CURRENT_THEME["warning"]
-    
-    tk.Label(
-        score_inner,
-        text=interpretation,
-        font=("Arial", 14, "italic"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=interpretation_color
-    ).pack(pady=(20, 0))
-    
-    # Analysis Options Section
-    analysis_header_frame = tk.Frame(main_content, bg=CURRENT_THEME["light_bg"])
-    analysis_header_frame.pack(fill="x", pady=(0, 20))
-    
-    tk.Label(
-        analysis_header_frame,
-        text="📊 Explore Your Results",
-        font=("Arial", 26, "bold"),
-        bg=CURRENT_THEME["light_bg"],
-        fg=CURRENT_THEME["text"]
-    ).pack(anchor="w")
-    
-    tk.Label(
-        analysis_header_frame,
-        text="Choose from our comprehensive analysis tools to gain deeper insights:",
-        font=("Arial", 14),
-        bg=CURRENT_THEME["light_bg"],
-        fg=CURRENT_THEME["subtext"]
-    ).pack(anchor="w", pady=(10, 0))
-    
-    # Analysis buttons grid - 2 columns
-    buttons_container = tk.Frame(main_content, bg=CURRENT_THEME["light_bg"])
-    buttons_container.pack(fill="both", expand=True, pady=(0, 30))
-    
-    # Function definitions for buttons
-    def open_dashboard():
-        analysis_window.destroy()
-        dashboard = AnalyticsDashboard(None, username)
-        dashboard.open_dashboard()
-        conn.close()
-    
-    def check_correlation():
-        messagebox.showinfo("Correlation Analysis", 
-            "This feature analyzes correlations between:\n\n"
-            "• Your responses across different emotional domains\n"
-            "• Age vs EQ score patterns and trends\n"
-            "• Response patterns and emotional regulation\n"
-            "• Question clusters and their relationships\n\n"
-            "Feature coming in the next update!")
-    
-    def advanced_analysis():
-        messagebox.showinfo("Advanced Analysis",
-            "Advanced analysis includes:\n\n"
-            "• Pattern recognition in emotional responses\n"
-            "• Emotional intelligence sub-domains breakdown\n"
-            "• Personalized growth recommendations\n"
-            "• Comparative analysis with peer groups\n"
-            "• Trend analysis across multiple assessments\n\n"
-            "Feature coming soon!")
-    
-    def generate_report():
-        messagebox.showinfo("Insights Report",
-            "Your personalized insights report includes:\n\n"
-            "• Strengths and areas for improvement\n"
-            "• Actionable development recommendations\n"
-            "• Progress tracking and milestone planning\n"
-            "• Emotional intelligence development roadmap\n"
-            "• Resource recommendations for growth\n\n"
-            "Feature in development!")
-    
-    def take_another_test():
-        analysis_window.destroy()
-        conn.close()
-        # Restart application
-        main()
-    
-    def view_history():
-        cursor.execute(
-            "SELECT id, total_score, timestamp FROM scores WHERE username = ? ORDER BY timestamp DESC LIMIT 10",
-            (username,)
-        )
-        history = cursor.fetchall()
-        
-        if history:
-            history_text = f"Recent Tests for {username}:\n\n"
-            for test_id, total_score, timestamp in history:
-                try:
-                    date_obj = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-                    date_str = date_obj.strftime("%b %d, %Y")
-                except:
-                    date_str = timestamp
-                history_text += f"• Test #{test_id}: {total_score}/{total_questions*5} points ({date_str})\n"
-            
-            history_text += f"\nTotal tests completed: {len(history)}"
-            messagebox.showinfo("Test History", history_text)
-        else:
-            messagebox.showinfo("Test History", "No test history found.")
-    
-    # Define button configurations
-    button_configs = [
-        {
-            "text": "📈 Detailed Dashboard",
-            "command": open_dashboard,
-            "bg": CURRENT_THEME["primary"],
-            "description": "Interactive dashboard with charts, trends, and visual analytics"
-        },
-        {
-            "text": "🔗 Check Correlation",
-            "command": check_correlation,
-            "bg": CURRENT_THEME["correlation"],
-            "description": "Analyze relationships between different emotional factors"
-        },
-        {
-            "text": "📊 Advanced Analysis",
-            "command": advanced_analysis,
-            "bg": CURRENT_THEME["analytics"],
-            "description": "Deep dive into patterns, clusters, and predictive insights"
-        },
-        {
-            "text": "📋 Generate Insights Report",
-            "command": generate_report,
-            "bg": CURRENT_THEME["insights"],
-            "description": "Personalized PDF report with actionable recommendations"
-        },
-        {
-            "text": "🔄 Take Another Test",
-            "command": take_another_test,
-            "bg": CURRENT_THEME["secondary"],
-            "description": "Retake assessment to track progress and improvement"
-        },
-        {
-            "text": "📜 View History",
-            "command": view_history,
-            "bg": CURRENT_THEME["accent"],
-            "description": "View past assessments and track your emotional growth"
+#ANALYTICS
+def compute_analytics(responses, time_taken, total_questions):
+    n = len(responses)
+    if n == 0:
+        return {
+            "avg": 0, "max": 0, "min": 0, "variance": 0,
+            "attempted": 0, "completion": 0, "avg_time": 0
         }
-    ]
-    
-    # Create buttons in 2x3 grid
-    for i, config in enumerate(button_configs):
-        row = i // 2
-        col = i % 2
-        
-        button_frame = tk.Frame(buttons_container, bg=CURRENT_THEME["light_bg"], padx=15, pady=15)
-        button_frame.grid(row=row, column=col, sticky="nsew", padx=15, pady=15)
-        
-        # Configure grid weights
-        buttons_container.grid_rowconfigure(row, weight=1)
-        buttons_container.grid_columnconfigure(col, weight=1)
-        
-        # Button
-        btn = tk.Button(
-            button_frame,
-            text=config["text"],
-            command=config["command"],
-            bg=config["bg"],
-            fg="white",
-            font=("Arial", 14, "bold"),
-            relief="flat",
-            padx=30,
-            pady=20,
-            cursor="hand2",
-            wraplength=250
-        )
-        btn.pack(fill="both", expand=True)
-        
-        # Description
-        tk.Label(
-            button_frame,
-            text=config["description"],
-            font=("Arial", 11),
-            bg=CURRENT_THEME["light_bg"],
-            fg=CURRENT_THEME["subtext"],
-            wraplength=280,
-            justify="center"
-        ).pack(pady=(10, 0))
-    
-    # Bottom navigation frame
-    bottom_frame = tk.Frame(content_frame, bg=CURRENT_THEME["light_bg"], pady=30)
-    bottom_frame.pack(fill="x", pady=(20, 0))
-    
-    bottom_inner = tk.Frame(bottom_frame, bg=CURRENT_THEME["light_bg"])
-    bottom_inner.pack(fill="x", padx=min(80, window_width//12))
-    
-    def return_to_main():
-        analysis_window.destroy()
-        conn.close()
-        # Restart the main application
-        main()
-    
-    tk.Button(
-        bottom_inner,
-        text="🏠 Return to Main Menu",
-        command=return_to_main,
-        bg="#607D8B",
-        fg="white",
-        font=("Arial", 12),
-        relief="flat",
-        padx=25,
-        pady=12,
-        cursor="hand2"
-    ).pack(side="left", padx=10)
-    
-    def close_all():
-        analysis_window.destroy()
-        conn.close()
-        exit()
-    
-    tk.Button(
-        bottom_inner,
-        text="Exit Application",
-        command=close_all,
-        bg="#757575",
-        fg="white",
-        font=("Arial", 12),
-        relief="flat",
-        padx=25,
-        pady=12,
-        cursor="hand2"
-    ).pack(side="right", padx=10)
-    
-    # Add mousewheel scrolling
-    def on_mousewheel(event):
-        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-    
-    # Bind mousewheel for scrolling
-    analysis_window.bind_all("<MouseWheel>", on_mousewheel)
-    
-    # Also bind for Linux
-    analysis_window.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
-    analysis_window.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
-    
-    # Clean up bindings when window closes
-    def on_close():
-        analysis_window.unbind_all("<MouseWheel>")
-        analysis_window.unbind_all("<Button-4>")
-        analysis_window.unbind_all("<Button-5>")
-        analysis_window.destroy()
-        conn.close()
-    
-    analysis_window.protocol("WM_DELETE_WINDOW", on_close)
-    
-    analysis_window.mainloop()
 
-# USER DETAILS WINDOW
-root = tk.Tk()
-root.title("SoulSense - User Details")
-root.geometry("450x380")
-root.resizable(False, False)
-root.configure(bg=CURRENT_THEME["light_bg"])
+    avg = sum(responses) / n
+    variance = sum((x - avg) ** 2 for x in responses) / n
 
-tk.Label(
-    root,
-    text="SoulSense Assessment",
-    font=("Arial", 22, "bold"),
-    bg=CURRENT_THEME["light_bg"],
-    fg=CURRENT_THEME["text"]
-).pack(pady=20)
-
-tk.Label(root, text="Enter your name:", font=("Arial", 13), bg=CURRENT_THEME["light_bg"], fg=CURRENT_THEME["text"]).pack()
-name_entry = tk.Entry(root, textvariable=tk.StringVar(), font=("Arial", 13), width=25, bg="white", relief="solid", borderwidth=1)
-name_entry.pack(pady=5)
-
-tk.Label(root, text="Enter your age:", font=("Arial", 13), bg=CURRENT_THEME["light_bg"], fg=CURRENT_THEME["text"]).pack()
-age_entry = tk.Entry(root, textvariable=tk.StringVar(), font=("Arial", 13), width=25, bg="white", relief="solid", borderwidth=1)
-age_entry.pack(pady=5)
-
-def submit_details():
-    username = name_entry.get().strip()
-    age_str = age_entry.get().strip()
-    
-    if not username:
-        messagebox.showerror("Error", "Please enter your name")
-        return
-    
-    if not age_str.isdigit():
-        messagebox.showerror("Error", "Please enter a valid age (numbers only)")
-        return
-    
-    user_age = int(age_str)
-    if user_age < 12:
-        messagebox.showerror("Error", "Age must be at least 12")
-        return
-
-    root.destroy()
-    start_quiz(username, user_age)
-
-tk.Button(
-    root,
-    text="Start Assessment",
-    command=submit_details,
-    bg=CURRENT_THEME["primary"],
-    fg="white",
-    font=("Arial", 13, "bold"),
-    width=20,
-    relief="flat",
-    padx=20,
-    pady=8,
-    cursor="hand2"
-).pack(pady=20)
-
-# Initialize features
-journal_feature = JournalFeature(root)
-
-# Settings button
-tk.Button(
-    root,
-    text="⚙️ Settings",
-    command=open_settings,
-    bg=CURRENT_THEME["accent"],
-    fg="white",
-    font=("Arial", 11),
-    width=20,
-    relief="flat",
-    padx=15,
-    pady=6,
-    cursor="hand2"
-).pack(pady=5)
-
-tk.Button(
-    root,
-    text="📝 Open Journal",
-    command=lambda: journal_feature.open_journal_window(name_entry.get() or "Guest"),
-    bg=CURRENT_THEME["secondary"],
-    fg="white",
-    font=("Arial", 11),
-    width=20,
-    relief="flat",
-    padx=15,
-    pady=6,
-    cursor="hand2"
-).pack(pady=5)
-
-tk.Button(
-    root,
-    text="📊 View Dashboard",
-    command=lambda: AnalyticsDashboard(root, name_entry.get() or "Guest").open_dashboard(),
-    bg=CURRENT_THEME["analytics"],
-    fg="white",
-    font=("Arial", 11),
-    width=20,
-    relief="flat",
-    padx=15,
-    pady=6,
-    cursor="hand2"
-).pack(pady=5)
-
-# QUIZ WINDOW
-def start_quiz(username, age):
-    # Use filtered questions based on QUESTION_COUNT setting
-    filtered_questions = questions[:QUESTION_COUNT]
-    
-    quiz = tk.Tk()
-    quiz.title(f"SoulSense Assessment - {username}")
-    quiz.geometry("850x650")
-    quiz.configure(bg=CURRENT_THEME["light_bg"])
-    
-    # Header frame
-    header_frame = tk.Frame(quiz, bg=CURRENT_THEME["primary"], height=80)
-    header_frame.pack(fill="x", pady=(0, 20))
-    header_frame.pack_propagate(False)
-    
-    tk.Label(
-        header_frame,
-        text="SoulSense EQ Assessment",
-        font=("Arial", 20, "bold"),
-        bg=CURRENT_THEME["primary"],
-        fg="white"
-    ).pack(pady=20)
-    
-    # Main content frame with card-like appearance
-    content_frame = tk.Frame(quiz, bg=CURRENT_THEME["card_bg"], relief="solid", borderwidth=1)
-    content_frame.pack(fill="both", expand=True, padx=40, pady=10)
-    
-    # Progress section
-    progress_frame = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"])
-    progress_frame.pack(fill="x", pady=(20, 10), padx=30)
-    
-    quiz_state = {
-        "current_q": 0,
-        "score": 0,
-        "responses": [],
-        "username": username,
-        "age": age
+    return {
+        "avg": round(avg, 2),
+        "max": max(responses),
+        "min": min(responses),
+        "variance": round(variance, 2),
+        "attempted": n,
+        "completion": round(n / total_questions, 2),
+        "avg_time": round(time_taken / n, 2)
     }
 
+#SPLASH SCREEN
+def show_splash():
+    splash = tk.Tk()
+    splash.title("SoulSense")
+    splash.geometry("500x300")
+    splash.resizable(False, False)
+    
+    theme = get_theme()
+    splash.configure(bg=theme["header_bg"])
+
+    tk.Label(
+        splash, text="SoulSense",
+        font=("Arial", 32, "bold"),
+        fg="white", bg=theme["header_bg"]
+    ).pack(pady=40)
+
+    tk.Label(
+        splash, text="Emotional Awareness Assessment",
+        font=("Arial", 14),
+        fg="#CCCCCC", bg=theme["header_bg"]
+    ).pack()
+
+    tk.Label(
+        splash,
+        text="Loading...",
+        font=("Arial", 15),
+        fg="white",
+        bg=theme["header_bg"]
+    ).pack(pady=30)
+    splash.after(2500, lambda: (play_sound("success"), splash.destroy(), show_user_details()))
+    splash.mainloop()
+
+#USER DETAILS
+def show_user_details():
+    root = tk.Tk()
+    root.title("SoulSense - User Details")
+    root.geometry("450x380")
+    root.resizable(False, False)
+    
+    theme = get_theme()
+    root.configure(bg=theme["bg"])
+
+    username = tk.StringVar()
+    age = tk.StringVar()
+
+    tk.Label(root, text="SoulSense Assessment",
+             font=("Arial", 20, "bold"),
+             bg=theme["bg"], fg=theme["text"]).pack(pady=20)
+
+    tk.Label(root, text="Enter your name:", 
+             font=("Arial", 15),
+             bg=theme["bg"], fg=theme["text"]).pack()
+    
+    tk.Entry(root, textvariable=username,
+             font=("Arial", 15), width=25,
+             bg="white" if CURRENT_THEME == "light" else "#2d2d2d",
+             fg=theme["text"]).pack(pady=8)
+
+    tk.Label(root, text="Enter your age:", 
+             font=("Arial", 15),
+             bg=theme["bg"], fg=theme["text"]).pack()
+    
+    tk.Entry(root, textvariable=age,
+             font=("Arial", 15), width=25,
+             bg="white" if CURRENT_THEME == "light" else "#2d2d2d",
+             fg=theme["text"]).pack(pady=8)
+
+    def start():
+        if not username.get().strip():
+            play_sound("error")
+            messagebox.showwarning(
+                "Name Required",
+                "Please enter your name to continue."
+            )
+            return
+
+        if not age.get().isdigit():
+            play_sound("error")
+            messagebox.showwarning(
+                "Invalid Age",
+                "Please enter your age using numbers only."
+            )
+            return
+
+        root.destroy()
+        play_sound("success")
+        start_quiz(username.get(), int(age.get()))
+
+    tk.Button(
+        root, text="Start Assessment",
+        command=start,
+        bg=theme["primary"], fg="white",
+        font=("Arial", 14, "bold"),
+        width=20
+    ).pack(pady=15)
+    
+    # Settings button added here
+    tk.Button(
+        root, text="⚙️ Settings",
+        command=lambda: open_settings(root),
+        bg=theme["secondary"], fg="white",
+        font=("Arial", 12),
+        width=15
+    ).pack(pady=5)
+
+    root.mainloop()
+
+#QUIZ
+def start_quiz(username, age):
+    # Use QUESTION_COUNT setting
+    filtered_questions = [q for q in questions if q["age_min"] <= age <= q["age_max"]][:QUESTION_COUNT]
+
+    if not filtered_questions:
+        play_sound("error")
+        messagebox.showinfo(
+            "No Questions Available",
+            "There are currently no questions available for your age group.\n"
+            "Please check back later."
+        )
+        return
+
+    total_questions = len(filtered_questions)
+
+    quiz = tk.Tk()
+    quiz.title("SoulSense Quiz")
+    quiz.geometry("750x600")
+    quiz.resizable(False, False)
+    
+    theme = get_theme()
+    quiz.configure(bg=theme["bg"])
+
+    responses = []
+    score = 0
+    current_q = 0
     var = tk.IntVar()
-    
-    # Question counter with better styling
-    counter_label = tk.Label(
-        progress_frame,
-        text="",
-        font=("Arial", 12, "bold"),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["primary"]
-    )
-    counter_label.pack(side="left")
-    
-    # Progress bar
-    progress_canvas = tk.Canvas(progress_frame, height=8, width=300, bg=CURRENT_THEME["border"], highlightthickness=0)
-    progress_canvas.pack(side="right")
-    progress_bar = progress_canvas.create_rectangle(0, 0, 0, 8, fill=CURRENT_THEME["primary"], outline="")
-    
-    # Question area
-    question_area = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"])
-    question_area.pack(fill="both", expand=True, padx=30, pady=10)
-    
-    # Question label with better styling
-    question_label = tk.Label(
-        question_area,
-        text="",
-        wraplength=700,
-        font=("Arial", 16),
-        bg=CURRENT_THEME["card_bg"],
-        fg=CURRENT_THEME["text"],
-        justify="left"
-    )
-    question_label.pack(anchor="w", pady=(20, 30))
-    
-    # Options frame
-    options_frame = tk.Frame(question_area, bg=CURRENT_THEME["card_bg"])
-    options_frame.pack(fill="both", expand=True, padx=10)
-    
-    options = [
+
+    start_time = time.time()
+
+    timer_label = tk.Label(quiz, font=("Arial", 14, "bold"), 
+                          fg=theme["timer"], bg=theme["bg"])
+    timer_label.pack(pady=5)
+
+    def update_timer():
+        elapsed = int(time.time() - start_time)
+        m, s = divmod(elapsed, 60)
+        timer_label.config(text=f"Time: {m:02d}:{s:02d}")
+        quiz.after(1000, update_timer)
+
+    update_timer()
+
+    question_label = tk.Label(quiz, wraplength=700, font=("Arial", 16),
+                             bg=theme["bg"], fg=theme["text"])
+    question_label.pack(pady=20)
+
+    for text, val in [
         ("Strongly Disagree", 1),
         ("Disagree", 2),
         ("Neutral", 3),
         ("Agree", 4),
         ("Strongly Agree", 5)
-    ]
-    
-    # Create radio buttons with better styling
-    radio_buttons = []
-    for i, (text, val) in enumerate(options):
-        rb_frame = tk.Frame(options_frame, bg=CURRENT_THEME["card_bg"])
-        rb_frame.pack(fill="x", pady=8)
-        
-        rb = tk.Radiobutton(
-            rb_frame,
-            text=text,
-            variable=var,
-            value=val,
-            font=("Arial", 13),
-            bg=CURRENT_THEME["card_bg"],
-            fg=CURRENT_THEME["text"],
-            selectcolor=CURRENT_THEME["primary"],
-            activebackground=CURRENT_THEME["card_bg"],
-            activeforeground=CURRENT_THEME["text"],
-            cursor="hand2"
-        )
-        rb.pack(side="left")
-        radio_buttons.append(rb)
-        
-        # Add hover effect
-        def on_enter(e, rb=rb):
-            rb.config(bg="#f5f5f5" if CURRENT_THEME == LIGHT_THEME else "#2a2a2a")
-        def on_leave(e, rb=rb):
-            rb.config(bg=CURRENT_THEME["card_bg"])
-        
-        rb.bind("<Enter>", on_enter)
-        rb.bind("<Leave>", on_leave)
-    
-    # Navigation buttons frame
-    nav_frame = tk.Frame(content_frame, bg=CURRENT_THEME["card_bg"])
-    nav_frame.pack(fill="x", pady=30, padx=30)
-    
-    def update_progress():
-        """Update progress bar and counter"""
-        current_q = quiz_state["current_q"]
-        total_q = len(filtered_questions)
-        
-        # Update counter
-        counter_label.config(text=f"Question {current_q + 1} of {total_q}")
-        
-        # Update progress bar
-        progress_width = (current_q / total_q) * 300 if total_q > 0 else 0
-        progress_canvas.coords(progress_bar, 0, 0, progress_width, 8)
-    
+    ]:
+        tk.Radiobutton(
+            quiz, text=text,
+            variable=var, value=val,
+            font=("Arial", 14),
+            bg=theme["bg"], fg=theme["text"],
+            selectcolor=theme["primary"],
+            activebackground=theme["bg"],
+            activeforeground=theme["text"]
+        ).pack(anchor="w", padx=60)
+
     def load_question():
-        current_q = quiz_state["current_q"]
         question_label.config(text=filtered_questions[current_q]["text"])
-        
-        if current_q < len(quiz_state["responses"]):
-            var.set(quiz_state["responses"][current_q])
-        else:
-            var.set(0)
-        
-        update_progress()
-    
-    def update_navigation_buttons():
-        current_q = quiz_state["current_q"]
-        if current_q == 0:
-            prev_btn.config(state="disabled", bg="#B0BEC5")
-        else:
-            prev_btn.config(state="normal", bg=CURRENT_THEME["secondary"])
-        
-        if current_q == len(filtered_questions) - 1:
-            next_btn.config(text="Finish Assessment ✓")
-        else:
-            next_btn.config(text="Next Question →")
-    
-    def save_current_answer():
-        current_answer = var.get()
-        if current_answer > 0:
-            current_q = quiz_state["current_q"]
-            if current_q < len(quiz_state["responses"]):
-                quiz_state["responses"][current_q] = current_answer
-            else:
-                quiz_state["responses"].append(current_answer)
-    
-    def previous_question():
-        save_current_answer()
-        if quiz_state["current_q"] > 0:
-            quiz_state["current_q"] -= 1
-            load_question()
-            update_navigation_buttons()
-    
-    def next_question():
-        current_q = quiz_state["current_q"]
 
-        if var.get() == 0:
-            messagebox.showwarning("Selection Required", "Please select an option to continue.")
-            return
+    def save_and_exit(title):
+        elapsed = int(time.time() - start_time)
+        analytics = compute_analytics(responses, elapsed, total_questions)
 
-        save_current_answer()
-        var.set(0)
-        
-        if current_q < len(filtered_questions) - 1:
-            quiz_state["current_q"] += 1
-            load_question()
-            update_navigation_buttons()
-        else:
-            quiz_state["score"] = sum(quiz_state["responses"])
-            
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor.execute(
-                "INSERT INTO scores (username, age, total_score, timestamp) VALUES (?, ?, ?, ?)",
-                (quiz_state["username"], quiz_state["age"], quiz_state["score"], timestamp)
-            )
+        def db_save():
+            cursor.execute("""
+                INSERT INTO scores
+                (username, age, total_score, avg_response, max_response, min_response,
+                 score_variance, questions_attempted, completion_ratio,
+                 avg_time_per_question, time_taken_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                username, age, score,
+                analytics["avg"], analytics["max"], analytics["min"],
+                analytics["variance"], analytics["attempted"],
+                analytics["completion"], analytics["avg_time"], elapsed
+            ))
             conn.commit()
 
-            # Store references before destroying quiz window
-            username = quiz_state["username"]
-            score = quiz_state["score"]
-            age = quiz_state["age"]
-            total_questions = len(filtered_questions)
-            
-            # Destroy the quiz window first
+        try:
+            retry_operation(db_save)
+        except Exception:
+            play_sound("error")
+            messagebox.showerror(
+                "Save Failed",
+                "We couldn’t save your results due to a temporary issue.\n"
+                "Please try again in a few moments."
+            )
             quiz.destroy()
-            
-            # Now show analysis in a new main window
-            show_analysis_complete(username, score, age, total_questions)
-    
-    # Previous button
-    prev_btn = tk.Button(
-        nav_frame,
-        text="← Previous Question",
-        command=previous_question,
-        bg="#B0BEC5",
-        fg="white",
-        font=("Arial", 12, "bold"),
-        width=18,
-        relief="flat",
-        padx=15,
-        pady=10,
-        cursor="hand2",
-        state="disabled"
-    )
-    prev_btn.pack(side="left", padx=10)
-    
-    # Next button
-    next_btn = tk.Button(
-        nav_frame,
-        text="Next Question →",
+            return
+
+        play_sound("success")
+        messagebox.showinfo(
+            title,
+            f"Assessment Summary\n\n"
+            f"Score: {score}\n"
+            f"Questions Attempted: {analytics['attempted']}\n"
+            f"Time Taken: {elapsed} seconds"
+        )
+
+        quiz.destroy()
+        conn.close()
+
+    def next_question():
+        nonlocal current_q, score
+        if var.get() == 0:
+            play_sound("error")
+            messagebox.showwarning(
+                "Selection Required",
+                "Please select an option before moving to the next question."
+            )
+            return
+
+        play_sound("click")
+        responses.append(var.get())
+        score += var.get()
+        var.set(0)
+        current_q += 1
+
+        if current_q < total_questions:
+            load_question()
+        else:
+            save_and_exit("Assessment Completed")
+
+    def stop_test():
+        if messagebox.askyesno(
+            "Stop Assessment",
+            "Are you sure you want to stop the assessment?\n"
+            "Your progress will be saved."
+        ):
+            play_sound("click")
+            save_and_exit("Assessment Stopped")
+
+    tk.Button(
+        quiz, text="Next",
         command=next_question,
-        bg=CURRENT_THEME["primary"],
-        fg="white",
-        font=("Arial", 12, "bold"),
-        width=18,
-        relief="flat",
-        padx=15,
-        pady=10,
-        cursor="hand2"
-    )
-    next_btn.pack(side="right", padx=10)
+        bg=theme["primary"], fg="white",
+        font=("Arial", 14, "bold"),
+        width=15
+    ).pack(pady=15)
+
+    tk.Button(
+        quiz, text="Stop Test",
+        command=stop_test,
+        bg=theme["warning"], fg="white",
+        font=("Arial", 13, "bold"),
+        width=15
+    ).pack()
     
-    # Add keyboard shortcuts
-    def on_key_press(event):
-        if event.keysym == 'Left' and quiz_state["current_q"] > 0:
-            previous_question()
-        elif event.keysym == 'Right' or event.keysym == 'Return':
-            next_question()
-    
-    quiz.bind('<Left>', on_key_press)
-    quiz.bind('<Right>', on_key_press)
-    quiz.bind('<Return>', on_key_press)
-    
-    # Initialize
+    # Settings button in quiz
+    tk.Button(
+        quiz, text="⚙️ Settings",
+        command=lambda: open_settings(quiz),
+        bg=theme["secondary"], fg="white",
+        font=("Arial", 12),
+        width=12
+    ).pack(pady=10)
+
     load_question()
-    update_navigation_buttons()
-    
     quiz.mainloop()
 
-def main():
-    """Main function to start the application"""
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()
+#START APP
+show_splash()
